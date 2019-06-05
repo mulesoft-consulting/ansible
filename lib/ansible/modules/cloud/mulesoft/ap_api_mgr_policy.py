@@ -97,6 +97,10 @@ EXAMPLES = '''
     environment: 'Sandbox'
     api_instance_id: '15722837'
     policy_version: '1.1.8'
+    options:
+      group_id: 'fe819df3-92cf-407a-adcd-098ff64131f1'
+      config: '{"property": "value"}'
+      pointcut: '[{"methodRegex":"GET"}]'
 
 
 # Example of enabling a policy on an existing managed API
