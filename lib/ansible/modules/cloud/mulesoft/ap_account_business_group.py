@@ -105,32 +105,40 @@ requirements:
 
 EXAMPLES = '''
 # Example of creating an empty business group
-- name: create gusiness group
+- name: create a business group
   ap_account_business_group:
-    bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
     name: 'My Demos'
     state: "present"
+    bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
 
 # Example of creating business group with 0.2 Sandbox vCores that allows creatin suborgs
-- name: create gusiness group
+- name: create a gusiness group
   ap_account_business_group:
-    bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
     name: 'My Demos'
     state: "present"
+    bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
     create_suborgs: true
     vcores_sandbox: 0.2
 
 # Example of deleting a business group
-- name: create gusiness group
+- name: delete a gusiness group
   ap_account_business_group:
-    bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
     name: 'My Demos'
-    operation: "absent"
+    state: "absent"
+    bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
 '''
 
 RETURN = '''
 bg_id:
     description: Created business group id
+    type: string
+    returned: success
+bg_client_id:
+    description: Created business group clientId
+    type: string
+    returned: success
+bg_client_secret:
+    description: Created business group clientSecret
     type: string
     returned: success
 msg:
@@ -149,10 +157,34 @@ def get_anypointcli_path(module):
     return module.get_bin_path('anypoint-cli', True, ['/usr/local/bin'])
 
 
+def get_business_group_client_secret(module, bg_id, bg_client_id):
+    return_value = None
+    server_name = 'https://' + module.params['host']
+    api_endpoint = '/accounts/api/organizations/' + bg_id + '/clients/' + bg_client_id
+    my_url = server_name + api_endpoint
+    user_id = get_user_id(module)
+
+    headers = {
+        'Accept': 'application/json',
+        'Authorization': 'bearer ' + module.params['bearer']
+    }
+
+    try:
+        resp = open_url(my_url, method="GET", headers=headers)
+    except Exception as e:
+        module.exit_json(msg=str(e))
+
+    resp_json = json.loads(resp.read())
+
+    return resp_json['client_secret']
+
+
 def do_no_action(module):
     return_value = dict(
         master_id=None,
-        target_id=None
+        target_id=None,
+        target_client_id=None,
+        target_client_secret=None
     )
     bearer_arg = '--bearer="' + module.params['bearer'] + '"'
     host_arg = '--host="' + module.params['host'] + '"'
@@ -192,6 +224,9 @@ def do_no_action(module):
     for item in resp_json['subOrganizations']:
         if (item['name'] == module.params['name']):
             return_value['target_id'] = item['id']
+            return_value['target_client_id'] = item['clientId']
+            return_value['target_client_secret'] = get_business_group_client_secret(module, item['id'], item['clientId'])
+
             break
 
     return return_value
@@ -219,7 +254,11 @@ def get_user_id(module):
 
 
 def create_business_group(module, master_id):
-    return_value = ''
+    return_value = dict(
+        bg_id=None,
+        bg_client_id=None,
+        bg_client_secret=None
+    )
     server_name = 'https://' + module.params['host']
     api_endpoint = '/accounts/api/organizations'
     my_url = server_name + api_endpoint
@@ -267,7 +306,9 @@ def create_business_group(module, master_id):
         module.exit_json(msg=str(e))
 
     resp_json = json.loads(resp.read())
-    return_value = resp_json["id"]
+    return_value['bg_id'] = resp_json["id"]
+    return_value['bg_client_id'] = resp_json["clientId"]
+    return_value['bg_client_secret'] = get_business_group_client_secret(module, resp_json["id"], resp_json["clientId"])
 
     return return_value
 
@@ -308,7 +349,10 @@ def run_module():
 
     result = dict(
         changed=False,
-        msg='No action taken'
+        msg='No action taken',
+        bg_id=None,
+        bg_client_id=None,
+        bg_client_secret=None
     )
 
     module = AnsibleModule(
@@ -332,22 +376,27 @@ def run_module():
         if (context['target_id'] is not None):
             # do nothing
             result['bg_id'] = context['target_id']
+            result['bg_client_id'] = context['target_client_id']
+            result['bg_client_secret'] = context['target_client_secret']
             module.exit_json(**result)
         else:
             output = create_business_group(module, context['master_id'])
 
-        if (output != ''):
             result['changed'] = True
-            result['bg_id'] = output
-            result['message'] = 'Business Group created'
-        else:
-            module.fail_json(msg=output['msg'])
+            result['bg_id'] = output['bg_id']
+            result['bg_client_id'] = output['bg_client_id']
+            result['bg_client_secret'] = output['bg_client_secret']
+            result['msg'] = 'Business Group created'
+
     elif (module.params['state'] == 'absent'):
         if context['target_id'] is None:
             # do nothing
             module.exit_json(**result)
         delete_business_group(module, context['target_id'])
         result['changed'] = True
+        result['bg_id'] = None
+        result['bg_client_id'] = None
+        result['bg_client_secret'] = None
         result['msg'] = 'Business group deleted'
 
     module.exit_json(**result)
