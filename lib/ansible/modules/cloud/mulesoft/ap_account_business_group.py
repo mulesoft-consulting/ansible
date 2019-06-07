@@ -157,6 +157,21 @@ def get_anypointcli_path(module):
     return module.get_bin_path('anypoint-cli', True, ['/usr/local/bin'])
 
 
+def execute_http_call(module, url, method, headers, payload):
+    return_Value = None
+    try:
+        if (headers is not None):
+            if (payload is not None):
+                return_value = open_url(url, method=method, headers=headers, data=payload)
+            else:
+                return_value = open_url(url, method=method, headers=headers)
+
+    except Exception as e:
+        module.fail_json(msg=str(e))
+
+    return return_value
+
+
 def get_business_group_client_secret(module, bg_id, bg_client_id):
     return_value = None
     server_name = 'https://' + module.params['host']
@@ -169,12 +184,7 @@ def get_business_group_client_secret(module, bg_id, bg_client_id):
         'Authorization': 'bearer ' + module.params['bearer']
     }
 
-    try:
-        resp = open_url(my_url, method="GET", headers=headers)
-    except Exception as e:
-        module.exit_json(msg=str(e))
-
-    resp_json = json.loads(resp.read())
+    resp_json = json.load(execute_http_call(module, my_url, 'GET', headers, None))
 
     return resp_json['client_secret']
 
@@ -194,7 +204,7 @@ def do_no_action(module):
 
     if result[0] != 0:
         return_value['msg'] = result[1]
-        module.exit_json(msg=result[1])
+        module.fail_json(msg=result[1])
 
     resp_json = json.loads(result[1])
 
@@ -215,12 +225,9 @@ def do_no_action(module):
         'Content-Type': 'application/json',
         'Authorization': 'bearer ' + module.params['bearer']
     }
-    try:
-        resp = open_url(my_url, method="GET", headers=headers)
-    except Exception as e:
-        module.exit_json(msg=str(e))
 
-    resp_json = json.loads(resp.read())
+    resp_json = json.load(execute_http_call(module, my_url, 'GET', headers, None))
+
     for item in resp_json['subOrganizations']:
         if (item['name'] == module.params['name']):
             return_value['target_id'] = item['id']
@@ -241,14 +248,14 @@ def get_user_id(module):
 
     result = module.run_command(cmd)
     if result[0] != 0:
-        module.exit_json(msg=result[1])
+        module.fail_json(msg=result[1])
 
     # check if the environment exists
     if len(result[1]) > 2:
         resp_json = json.loads(result[1])
         return_value = resp_json['Id']
     else:
-        module.exit_json(msg='Unknown error')
+        module.fail_json(msg='Unknown error')
 
     return return_value
 
@@ -300,12 +307,8 @@ def create_business_group(module, master_id):
         }
     }
 
-    try:
-        resp = open_url(my_url, method="POST", headers=headers, data=json.dumps(payload))
-    except Exception as e:
-        module.exit_json(msg=str(e))
+    resp_json = json.load(execute_http_call(module, my_url, 'POST', headers, json.dumps(payload)))
 
-    resp_json = json.loads(resp.read())
     return_value['bg_id'] = resp_json["id"]
     return_value['bg_client_id'] = resp_json["clientId"]
     return_value['bg_client_secret'] = get_business_group_client_secret(module, resp_json["id"], resp_json["clientId"])
@@ -322,10 +325,7 @@ def delete_business_group(module, target_id):
         'Content-Type': 'application/json',
         'Authorization': 'bearer ' + module.params['bearer']
     }
-    try:
-        resp = open_url(my_url, method="DELETE", headers=headers)
-    except Exception as e:
-        module.fail_json(msg=str(e))
+    execute_http_call(module, my_url, 'DELETE', headers, None)
 
 
 def run_module():
