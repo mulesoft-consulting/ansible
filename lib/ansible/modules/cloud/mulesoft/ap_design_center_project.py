@@ -171,7 +171,7 @@ def execute_http_call(module, url, method, headers, payload):
                 return_value = open_url(url, method=method, headers=headers)
 
     except Exception as e:
-        module.exit_json(msg=str(e))
+        module.fail_json(msg=str(e))
 
     return return_value
 
