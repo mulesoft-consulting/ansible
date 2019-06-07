@@ -110,7 +110,7 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
-message:
+msg:
     description: The output message that the module generates
     type: string
     returned: always
@@ -127,7 +127,8 @@ except:
     HAS_LIB = False
     LIB_IMP_ERR = traceback.format_exc()
 
-from pprint import pprint
+#from pprint import pprint
+from ansible.module_utils.basic import missing_required_lib
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.urls import open_url
 
@@ -309,7 +310,7 @@ def run_module():
 
     result = dict(
         changed=False,
-        message=''
+        msg=''
     )
 
     module = AnsibleModule(
@@ -317,6 +318,9 @@ def run_module():
         supports_check_mode=True
     )
 
+    if not HAS_LIB:
+        module.fail_json(msg=missing_required_lib("requests"),
+                     exception=LIB_IMP_ERR)
     # if the user is working with this module in only check mode we do not
     # want to make any changes to the environment, just return the current
     # state with no modifications
@@ -332,15 +336,12 @@ def run_module():
 
     # finally update the portal with either default values or with specified ones
     update_page(module, set_default_content)
-    result['message'] = 'home page updated'
+    result['msg'] = 'home page updated'
     result['changed'] = True
     module.exit_json(**result)
 
 
 def main():
-    if not HAS_LIB:
-        module.fail_json(msg=missing_required_lib("requests"),
-                     exception=LIB_IMP_ERR)
     run_module()
 
 

@@ -151,6 +151,7 @@ msg:
 '''
 
 import os
+import shutil
 import re
 import json
 from ansible.module_utils.basic import AnsibleModule
@@ -178,7 +179,8 @@ def execute_http_call(module, url, method, headers, payload):
 
 def do_no_action_design_center(module, cmd_base):
     return_value = None
-    cmd_final = cmd_base + ' list --output json "' + module.params['name'] + '"'
+    cmd_final = cmd_base + ' list --output json --pageIndex 0 --pageSize 500' 
+    cmd_final += ' "' + module.params['name'] + '"'
 
     result = module.run_command(cmd_final)
 
@@ -197,6 +199,10 @@ def do_no_action_design_center(module, cmd_base):
 
 def do_no_action_exchange(module):
     return_value = None
+    if (module.params['type'] == 'raml'):
+        asset_type = 'rest-api'
+    elif (module.params['type'] == 'raml-fragment'):
+        asset_type = 'raml-fragment'
     # Query exchange using the Graph API
     my_url = 'https://' + module.params['host'] + '/graph/api/v1/graphql'
     headers = {
@@ -217,7 +223,7 @@ def do_no_action_exchange(module):
         if (module.params['exchange_metadata']['asset_id'] == item['assetId']
                 and module.params['exchange_metadata']['group_id'] == item['groupId']
                 and module.params['exchange_metadata']['asset_version'] == item['version']
-                and module.params['type'] == item['type']):
+                and asset_type == item['type']):
             return_value = item['assetId']
 
     return return_value
@@ -268,6 +274,8 @@ def replace_file_str_regex(file_name, regex, rep_str):
 
 
 def prepare_project_to_upload(project_dir, org_id):
+    # delete exchange_modules directory
+    shutil.rmtree(project_dir + '/exchange_modules', ignore_errors=True, onerror=None)
     # replace org id in exchange.json file
     exchange_file = os.path.join(project_dir, 'exchange.json')
     regex = '"groupId":\s?"' + get_org_id_regex() + '"'
@@ -286,7 +294,8 @@ def prepare_project_to_upload(project_dir, org_id):
 
 def create_empty_project(module, cmd_base):
     cmd_final = cmd_base + " create --type " + module.params['type']
-    cmd_final += " --fragment-type " + module.params['fragment_type']
+    if (module.params['type'] == 'raml-fragment'):
+        cmd_final += " --fragment-type " + module.params['fragment_type']
     cmd_final += ' "' + module.params['name'] + '"'
     result = module.run_command(cmd_final)
 
