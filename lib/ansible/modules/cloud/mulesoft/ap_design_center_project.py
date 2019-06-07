@@ -106,7 +106,9 @@ requirements:
 
 EXAMPLES = '''
 # Create a fragment project on design center
-- name: 'My Fragment'
+- name: Create a fragment project on design center
+  ap_design_center_project:
+    name: 'My Fragment'
     state: 'present'
     bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
     organization: 'My Demos'
@@ -116,7 +118,9 @@ EXAMPLES = '''
     project_dir: '/tmp/my-fragment'
 
 # Create a fragment project on Design Center and publish it to Exchange
-- name: 'My Fragment'
+- name: Create a fragment project on Design Center and publish it to Exchange
+  ap_design_center_project:
+    name: 'My Fragment'
     state: 'published'
     bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
     organization: 'My Demos'
@@ -130,7 +134,9 @@ EXAMPLES = '''
       asset_id: 'my-fragment'
 
 # Delete a fragment project from Design Center
-- name: 'My Fragment'
+- name: Delete a fragment project from Design Center
+  ap_design_center_project:
+    name: 'My Fragment'
     state: 'absent'
     bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
     organization: 'My Demos'
@@ -154,6 +160,7 @@ from ansible.module_utils.urls import open_url
 def get_anypointcli_path(module):
     return module.get_bin_path('anypoint-cli', True, ['/usr/local/bin'])
 
+
 def execute_http_call(module, url, method, headers, payload):
     return_Value = None
     try:
@@ -167,6 +174,7 @@ def execute_http_call(module, url, method, headers, payload):
         module.exit_json(msg=str(e))
 
     return return_value
+
 
 def do_no_action_design_center(module, cmd_base):
     return_value = None
@@ -201,13 +209,13 @@ def do_no_action_exchange(module):
                  'searchTerm: "' + module.params['exchange_metadata']['asset_id'] + '"'
                  ', offset: 0, limit: 100}){assetId groupId version type}}'
     }
-    print(payload)
+
     output = json.load(execute_http_call(module, my_url, 'POST', headers, json.dumps(payload)))
-    print(output)
+
     # check if the environment exists
     for item in output['data']['assets']:
         if (module.params['exchange_metadata']['asset_id'] == item['assetId']
-                and module.params['exchange_metadata']['group_id'] == item['groupId'] 
+                and module.params['exchange_metadata']['group_id'] == item['groupId']
                 and module.params['exchange_metadata']['asset_version'] == item['version']
                 and module.params['type'] == item['type']):
             return_value = item['assetId']
