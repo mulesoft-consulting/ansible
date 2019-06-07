@@ -148,11 +148,25 @@ import os
 import re
 import json
 from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.urls import open_url
 
 
 def get_anypointcli_path(module):
     return module.get_bin_path('anypoint-cli', True, ['/usr/local/bin'])
 
+def execute_http_call(module, url, method, headers, payload):
+    return_Value = None
+    try:
+        if (headers is not None):
+            if (payload is not None):
+                return_value = open_url(url, method=method, headers=headers, data=payload)
+            else:
+                return_value = open_url(url, method=method, headers=headers)
+
+    except Exception as e:
+        module.exit_json(msg=str(e))
+
+    return return_value
 
 def do_no_action_design_center(module, cmd_base):
     return_value = None
@@ -173,23 +187,30 @@ def do_no_action_design_center(module, cmd_base):
     return return_value
 
 
-def do_no_action_exchange(module, cmd_base):
+def do_no_action_exchange(module):
     return_value = None
-    asset_exists = False
-    cmd_final = cmd_base.replace(' designcenter project', '') + ' exchange asset list --output json --limit 250 "' + module.params['name'] + '"'
-
-    result = module.run_command(cmd_final)
-
-    if result[0] != 0:
-        module.fail_json(msg=result[1])
-
+    # Query exchange using the Graph API
+    my_url = 'https://' + module.params['host'] + '/graph/api/v1/graphql'
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer ' + module.params['bearer']
+    }
+    payload = {
+        'query': '{assets(query: {organizationIds: ["' + module.params['organization_id'] + '"],'
+                 'searchTerm: "' + module.params['exchange_metadata']['asset_id'] + '"'
+                 ', offset: 0, limit: 100}){assetId groupId version type}}'
+    }
+    print(payload)
+    output = json.load(execute_http_call(module, my_url, 'POST', headers, json.dumps(payload)))
+    print(output)
     # check if the environment exists
-    if len(result[1]) > 2:
-        resp_json = json.loads(result[1])
-        for item in resp_json:
-            if (module.params['exchange_metadata']['group_id'] == item['GroupID'] and module.params['exchange_metadata']['asset_id'] == item['AssetID']):
-                if (module.params['name'] == item['Name'] and module.params['exchange_metadata']['asset_version'] == item['Version']):
-                    return_value = item['AssetID']
+    for item in output['data']['assets']:
+        if (module.params['exchange_metadata']['asset_id'] == item['assetId']
+                and module.params['exchange_metadata']['group_id'] == item['groupId'] 
+                and module.params['exchange_metadata']['asset_version'] == item['version']
+                and module.params['type'] == item['type']):
+            return_value = item['assetId']
 
     return return_value
 
@@ -201,7 +222,7 @@ def do_no_action(module, cmd_base):
     )
     return_value['design_center_id'] = do_no_action_design_center(module, cmd_base)
     if (module.params['state'] == 'published'):
-        return_value['exchange_id'] = do_no_action_exchange(module, cmd_base)
+        return_value['exchange_id'] = do_no_action_exchange(module)
 
     return return_value
 
