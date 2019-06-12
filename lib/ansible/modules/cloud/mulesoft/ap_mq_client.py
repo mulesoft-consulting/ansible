@@ -141,7 +141,6 @@ def get_org_id(module):
 
 def get_environment_id(module):
     env_id = None
-    # https://anypoint.mulesoft.com/accounts/api/organizations/6c5baf51-15ed-4903-bc62-35df1fd8cd7c/environments
     my_url = 'https://' + module.params['host'] + '/accounts/api/organizations/' + module.params['organization_id'] + '/environments'
     headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
     output = json.load(execute_http_call(module, my_url, 'GET', headers, None))
@@ -276,8 +275,6 @@ def run_module():
     # exit if I need to do nothing, so check if environment exists
     if (module.params['organization_id'] is None):
         module.params['organization_id'] = get_org_id(module)
-    if (module.params['organization_id'] is None):
-        module.fail_json(msg='organization does not exists')
 
     context = do_no_action(module)
 
