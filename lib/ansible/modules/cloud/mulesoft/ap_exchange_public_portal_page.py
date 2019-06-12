@@ -83,9 +83,8 @@ msg:
 '''
 
 import json
-import urllib
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.six.moves.urllib.parse import urlencode
+from ansible.module_utils.six.moves.urllib.parse import urlencode, quote
 from ansible.module_utils.urls import open_url
 
 
@@ -197,7 +196,7 @@ def publish_portal(module, portal_url):
 
 def update_page_content_only(module, exchange_portal_base_url):
     server_name = get_exchange_portal_base_url(module)
-    api_endpoint = '/draft/pages/' + urllib.quote(module.params['name'])
+    api_endpoint = '/draft/pages/' + quote(module.params['name'])
     my_url = server_name + api_endpoint
 
     headers = {
@@ -254,7 +253,7 @@ def update_page(module):
 
 def delete_page(module):
     exchange_portal_base_url = get_exchange_portal_base_url(module)
-    api_endpoint = '/draft/pages/' + urllib.quote(module.params['name'])
+    api_endpoint = '/draft/pages/' + quote(module.params['name'])
     my_url = exchange_portal_base_url + api_endpoint
 
     headers = {
