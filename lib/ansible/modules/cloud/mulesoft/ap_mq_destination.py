@@ -378,7 +378,7 @@ def run_module():
         organization_id=dict(type='str', required=False),
         environment=dict(type='str', required=False, default='Sandbox'),
         region=dict(type='str', required=False, default='us-east-1', choices=['us-east-1', 'us-west-2', 'ca-central-1', 'eu-west-1', 'eu-west-2']),
-        attributes=dict(type='dict', options=attributes_spec),
+        attributes=dict(type='dict', options=attributes_spec)
     )
 
     result = dict(
