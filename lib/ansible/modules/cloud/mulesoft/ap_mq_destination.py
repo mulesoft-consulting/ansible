@@ -180,11 +180,11 @@ def get_mq_url(module):
 
 def execute_http_call(module, url, method, headers, payload):
     return_value = None
-    print(method + ' to ' + url)
+
     try:
         if (headers is not None):
             if (payload is not None):
-                print(payload)
+
                 return_value = open_url(url, method=method, headers=headers, data=payload)
             else:
                 return_value = open_url(url, method=method, headers=headers)
