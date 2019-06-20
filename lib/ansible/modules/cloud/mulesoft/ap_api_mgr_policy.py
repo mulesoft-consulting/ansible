@@ -33,7 +33,7 @@ options:
             - Assert the state of the managed API. Use C(present) to apply a policy over an API, C(enabled) to enable an existing policy,
               C(disabled) to disable it and C(absent) to remove it.
         required: true
-        choices: [ "present", "enabled", "disabled", absent" ]
+        choices: [ "present", "enabled", "disabled", "absent" ]
     bearer:
         description:
             - Anypoint Platform access token for an active session
