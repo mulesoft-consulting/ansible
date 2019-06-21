@@ -227,6 +227,8 @@ def do_no_action(module, cmd_base):
     if result[0] != 0:
         module.fail_json(msg=result[1])
 
+    if not result[1].strip(): return return_value
+
     resp_json = json.loads(result[1])
     # check if the API is already managed
     for item in resp_json:
@@ -258,7 +260,7 @@ def create_update_api(module, cmd_base, context):
     if (module.params['references_user_domain'] is True):
         options += ' --referencesUserDomain'
     if (module.params['mule_4'] is True):
-        options += ' --muleVersion4OrAbove'
+        options += ' --muleVersion4OrAbove '
     options += ' --deploymentType "' + module.params['deployment_type'] + '"'
     if (module.params['uri'] is not None):
         options += ' --uri "' + + module.params['uri'] + '"'
