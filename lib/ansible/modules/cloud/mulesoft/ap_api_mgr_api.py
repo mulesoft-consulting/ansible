@@ -421,6 +421,8 @@ def run_module():
 
     # exit if I need to do nothing
     context = do_no_action(module, cmd_base)
+    result['api_instance_id'] = context['api_instance_id']
+
     if (context['do_nothing'] is True):
         module.exit_json(**result)
 
