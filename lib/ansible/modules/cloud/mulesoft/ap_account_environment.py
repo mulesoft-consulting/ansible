@@ -67,7 +67,7 @@ EXAMPLES = '''
     name: 'Production'
     state: 'present'
     bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
-    host: 'anypoint.mulesoft.com
+    host: 'anypoint.mulesoft.com'
     organization: 'My Demos'
 
 # Example of creating a Development Environment
@@ -89,6 +89,18 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
+id:
+    description: Id for the environment
+    type: string
+    returned: always
+client_id:
+    description: Client id for the environment
+    type: string
+    returned: always
+client_secret:
+    description: Client secret for the environment
+    type: string
+    returned: always
 msg:
     description: Anypoint CLI command output
     type: string
@@ -97,36 +109,138 @@ msg:
 
 import json
 from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.urls import open_url
 
 
 def get_anypointcli_path(module):
     return module.get_bin_path('anypoint-cli', True, ['/usr/local/bin'])
 
 
-def do_no_action(module):
-    return_value = False
-    environment_exists = False
-    cmd = get_anypointcli_path(module) + ' --bearer="' + module.params['bearer'] + '"'
-    cmd += ' --host="' + module.params['host'] + '"'
-    cmd += ' --organization="' + module.params['organization'] + '"'
-    cmd += ' account environment list --output json'
-
+def execute_anypoint_cli(module, cmd):
     result = module.run_command(cmd)
-
     if result[0] != 0:
         module.fail_json(msg=result[1])
 
-    resp_json = json.loads(result[1])
-    # check if the environment exists
-    for item in resp_json:
-        if (item['Name'] == module.params['name']):
-            environment_exists = True
+    return result[1]
+
+
+def execute_http_call(module, url, method, headers, payload):
+    return_value = None
+    try:
+        if (headers is not None):
+            if (payload is not None):
+                return_value = open_url(url, method=method, headers=headers, data=payload)
+            else:
+                return_value = open_url(url, method=method, headers=headers)
+
+    except Exception as e:
+        module.fail_json(msg='Error executinh HTTP call: ' + str(e))
+
+    return return_value
+
+
+def get_org_id(module):
+    org_id = None
+    my_url = 'https://' + module.params['host'] + '/accounts/api/profile'
+    headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
+    output = json.load(execute_http_call(module, my_url, 'GET', headers, None))
+    for item in output['memberOfOrganizations']:
+        if (item['name'] == module.params['organization']):
+            org_id = item['id']
             break
+    if (org_id is None):
+        module.fail_json(msg='Business Group {' + module.params['organization'] + '} not found')
+
+    return org_id
+
+
+def get_environment(module, cmd_base):
+    return_value = None
+    error_message = 'Error: Environment not found'
+    cmd_final = cmd_base
+    cmd_final += ' describe'
+    cmd_final += ' "' + module.params['name'] + '"'
+    cmd_final += ' --output json'
+    result = module.run_command(cmd_final)
+    if (result[0] == 0):
+        return_value = json.loads(result[1])
+    elif (result[0] == 255 and result[1].replace('\n', '') == error_message):
+        return_value = {}
+    else:
+        module.fail_json(msg=result[1])
+
+    return return_value
+
+
+def get_env_client_secret(module, org_id, client_id):
+    return_value = None
+    my_url = 'https://' + module.params['host'] + '/accounts/api/organizations/' + org_id + '/clients/' + client_id
+    headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
+    output = json.load(execute_http_call(module, my_url, 'GET', headers, None))
+
+    return output.get('client_secret')
+
+
+def get_context(module, cmd_base):
+    return_value = dict(
+        do_nothing=False,
+        id=None,
+        client_id=None,
+        client_secret=None
+    )
+    org_id = None
+    resp_json = get_environment(module, cmd_base)
+    if (resp_json != {}):
+        return_value['id'] = resp_json['ID']
+        return_value['client_id'] = resp_json['Client ID']
 
     if (module.params['state'] == "absent"):
-        return_value = not environment_exists
+        return_value['do_nothing'] = (return_value['id'] is None)
     elif (module.params['state'] == "present"):
-        return_value = environment_exists
+        if (return_value['id'] is None):
+            return_value['do_nothing'] = False
+        else:
+            client_secret = get_env_client_secret(module, get_org_id(module), return_value['client_id'])
+            return_value['client_secret'] = client_secret
+            return_value['do_nothing'] = True
+
+    return return_value
+
+
+def create_environment(module, cmd_base):
+    return_value = dict(
+        id=None,
+        client_id=None,
+        client_secret=None,
+        msg=None
+    )
+    cmd_final = cmd_base
+    cmd_final += ' create --type ' + module.params['type']
+    cmd_final += ' "' + module.params['name'] + '"'
+    resp = execute_anypoint_cli(module, cmd_final)
+
+    resp_json = get_environment(module, cmd_base)
+    return_value['id'] = resp_json['ID']
+    return_value['client_id'] = resp_json['Client ID']
+    client_secret = get_env_client_secret(module, get_org_id(module), return_value['client_id'])
+    return_value['client_secret'] = client_secret
+    return_value['msg'] = 'environment created'
+
+    return return_value
+
+
+def delete_environment(module, cmd_base):
+    return_value = dict(
+        id=None,
+        client_id=None,
+        client_secret=None,
+        msg=None
+    )
+    cmd_final = cmd_base
+    cmd_final += ' delete'
+    cmd_final += ' "' + module.params['name'] + '"'
+    resp = execute_anypoint_cli(module, cmd_final)
+    return_value['msg'] = 'environment deleted'
 
     return return_value
 
@@ -144,6 +258,9 @@ def run_module():
 
     result = dict(
         changed=False,
+        id=None,
+        client_id=None,
+        client_secret=None,
         msg='No action taken'
     )
 
@@ -161,30 +278,32 @@ def run_module():
     if module.check_mode:
         module.exit_json(**result)
 
-    # exit if I need to do nothing, so check if environment exists
-    if (do_no_action(module) is True):
-        module.exit_json(**result)
-
     cmd = get_anypointcli_path(module) + ' --bearer="' + module.params['bearer'] + '"'
     cmd += ' --organization="' + module.params['organization'] + '"'
-    cmd += ' --host="' + module.params['organization'] + '"'
+    cmd += ' --host="' + module.params['host'] + '"'
     cmd += ' account environment'
     cmd_base = cmd
 
+    # exit if I need to do nothing, so check if environment exists
+    context = get_context(module, cmd_base)
+    result['id'] = context['id']
+    result['client_id'] = context['client_id']
+    result['client_secret'] = context['client_secret']
+
+    if (context['do_nothing'] is True):
+        module.exit_json(**result)
+
     # Parameters set action
     if module.params['state'] == "present":
-        cmd += ' create --type ' + module.params['type']
+        output = create_environment(module, cmd_base)
     elif module.params['state'] == "absent":
-        cmd += ' delete'
+        output = delete_environment(module, cmd_base)
 
-    cmd += ' "' + module.params['name'] + '"'
-    output = module.run_command(cmd)
-
-    if output[0] != 0:
-        module.exit_json(msg=output[1])
-    else:
-        result['msg'] = output[1]
-        result['changed'] = True
+    result['msg'] = output['msg']
+    result['id'] = output['id']
+    result['client_id'] = output['client_id']
+    result['client_secret'] = output['client_secret']
+    result['changed'] = True
 
     module.exit_json(**result)
 
