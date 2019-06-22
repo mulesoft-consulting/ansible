@@ -129,15 +129,15 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
-bg_id:
+id:
     description: Created business group id
     type: string
     returned: success
-bg_client_id:
+client_id:
     description: Created business group clientId
     type: string
     returned: success
-bg_client_secret:
+client_secret:
     description: Created business group clientSecret
     type: string
     returned: success
@@ -350,9 +350,9 @@ def run_module():
     result = dict(
         changed=False,
         msg='No action taken',
-        bg_id=None,
-        bg_client_id=None,
-        bg_client_secret=None
+        id=None,
+        client_id=None,
+        client_secret=None
     )
 
     module = AnsibleModule(
@@ -375,17 +375,17 @@ def run_module():
     if (module.params['state'] == 'present'):
         if (context['target_id'] is not None):
             # do nothing
-            result['bg_id'] = context['target_id']
-            result['bg_client_id'] = context['target_client_id']
-            result['bg_client_secret'] = context['target_client_secret']
+            result['id'] = context['target_id']
+            result['client_id'] = context['target_client_id']
+            result['client_secret'] = context['target_client_secret']
             module.exit_json(**result)
         else:
             output = create_business_group(module, context['master_id'])
 
             result['changed'] = True
-            result['bg_id'] = output['bg_id']
-            result['bg_client_id'] = output['bg_client_id']
-            result['bg_client_secret'] = output['bg_client_secret']
+            result['id'] = output['bg_id']
+            result['client_id'] = output['bg_client_id']
+            result['client_secret'] = output['bg_client_secret']
             result['msg'] = 'Business Group created'
 
     elif (module.params['state'] == 'absent'):
@@ -394,9 +394,9 @@ def run_module():
             module.exit_json(**result)
         delete_business_group(module, context['target_id'])
         result['changed'] = True
-        result['bg_id'] = None
-        result['bg_client_id'] = None
-        result['bg_client_secret'] = None
+        result['id'] = None
+        result['client_id'] = None
+        result['client_secret'] = None
         result['msg'] = 'Business group deleted'
 
     module.exit_json(**result)
