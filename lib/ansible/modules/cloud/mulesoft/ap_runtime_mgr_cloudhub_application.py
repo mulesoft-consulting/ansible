@@ -30,7 +30,8 @@ options:
         required: true
     state:
         description:
-            - Assert the state of the application. Use C(present) to create an application, C(started) to start it or c(undeployed) to stop it and C(absent) to delete it.
+            - Assert the state of the application. Use C(present) to create an application, C(started) to start it
+              or C(undeployed) to stop it, and C(absent) to delete it.
         required: true
         choices: [ "present", "started", "undeployed", "absent" ]
     bearer:
@@ -53,7 +54,7 @@ options:
         default: Sandbox
     file:
         description:
-            - Deployable file; .jar for mule 4 app or .zip for mule 3 app
+            - Deployable file .jar for mule 4 app or .zip for mule 3 app
             - Required for C(present) state
         required: false
     runtime:
@@ -76,7 +77,8 @@ options:
         description:
             - Name of the region to deploy to
         required: false
-        choices: [ "us-east-1", "us-east-2", "us-west-1", "us-west-2", "ca-central-1", "eu-west-1", "eu-central-1", "eu-west-2", "ap-northeast-1", "ap-southeast-1", "ap-southeast-2", "sa-east-1" ]
+        choices: [ "us-east-1", "us-east-2", "us-west-1", "us-west-2", "ca-central-1", "eu-west-1", "eu-central-1",
+                   "eu-west-2", "ap-northeast-1", "ap-southeast-1", "ap-southeast-2", "sa-east-1" ]
         default: "us-east-1"
     persistent_queues:
         description:
@@ -90,7 +92,7 @@ options:
         default: false
     static_ips_enabled:
         description:
-            - Enable or disable static IPs. Can take C(Enable) or C(Disabled) values
+            - Enable or disable static IPs. Can take C(Enabled) or C(Disabled) values
         required: false
         choices: [ "Enabled", "Disabled" ]
         default: 'Disabled'
@@ -106,12 +108,12 @@ options:
         default: false
     properties:
         description:
-            - A list of properties with the format C((name:value) 
-            - The property to be set must be passed enclosed in quotes and characters : and = must be escaped
+            - A list of properties with the format C(name:value)
+            - The property to be set must be passed enclosed in quotes and characters C(:) and C(=) must be escaped
         required: false
     properties_file:
         description:
-            - Overwrite all properties with values from this file. The file format is 1 or more lines in C(name:value) format. 
+            - Overwrite all properties with values from this file. The file format is 1 or more lines in C(name:value) format
             - Set the absolute path of the properties file in your local hard drive.
 
 author:
@@ -137,8 +139,8 @@ EXAMPLES = '''
     region: 'us-west-1'
     auto_start: true
     properties:
-        - 'db.user\=oliver'
-        - 'db.pswd\=queen'
+        - "db.user\\=oliver"
+        - "db.pswd\\=queen"
 
 # Stop an application from Runtime Manager
 - name: Stop an application from Runtime Manager
@@ -203,7 +205,7 @@ def get_application(module, cmd_base):
     return_value = {}
     error_msg = 'Error: No application with domain ' + module.params['name'] + ' found.\n'
 
-    cmd_final = cmd_base + ' describe-json ' 
+    cmd_final = cmd_base + ' describe-json '
     cmd_final += ' "' + module.params['name'] + '"'
 
     result = module.run_command(cmd_final)
@@ -224,14 +226,14 @@ def application_needs_update(module, cloudhub_app):
     #   describe oepration on anypoint-cli
     # - file name is not compared
     if ((cloudhub_app.get('region') != module.params['region'])
-        or (cloudhub_app.get('muleVersion')['version'] != module.params['runtime'])
-        or (cloudhub_app.get('persistentQueues') != module.params['persistent_queues'])
-        or (cloudhub_app.get('persistentQueuesEncrypted') != module.params['persistent_queues_encripted'])
-        or (cloudhub_app.get('staticIPsEnabled') != module.params['static_ips_enabled'])
-        or (cloudhub_app.get('monitoringAutoRestart') != module.params['auto_restart'])
-        or (cloudhub_app.get('workers')['amount'] != module.params['workers'])
-        or (str(cloudhub_app.get('workers')['type']['weight']) != module.params['worker_size'])):
-            return_value = True
+            or (cloudhub_app.get('muleVersion')['version'] != module.params['runtime'])
+            or (cloudhub_app.get('persistentQueues') != module.params['persistent_queues'])
+            or (cloudhub_app.get('persistentQueuesEncrypted') != module.params['persistent_queues_encripted'])
+            or (cloudhub_app.get('staticIPsEnabled') != module.params['static_ips_enabled'])
+            or (cloudhub_app.get('monitoringAutoRestart') != module.params['auto_restart'])
+            or (cloudhub_app.get('workers')['amount'] != module.params['workers'])
+            or (str(cloudhub_app.get('workers')['type']['weight']) != module.params['worker_size'])):
+        return_value = True
 
     return return_value
 
@@ -267,7 +269,7 @@ def get_context(module, cmd_base):
     elif (module.params['state'] == 'absent'):
         if (return_value['app_url'] is None) or (return_value['app_status'] == 'DELETED'):
             return_value['do_nothing'] = True
-    
+
     return return_value
 
 
@@ -280,10 +282,10 @@ def create_or_update_cloudhub_application(module, cmd_base, context):
 
     cmd_final = cmd_base
     if (context['must_update'] is False):
-        #return_value = create_cloudhub_application(module, cmd_base, context)
+        # return_value = create_cloudhub_application(module, cmd_base, context)
         cmd_final += ' deploy'
     else:
-        #return_value = update_cloudhub_application(module, cmd_base, context)
+        # return_value = update_cloudhub_application(module, cmd_base, context)
         cmd_final += ' modify'
     # add all options
     cmd_final += ' --runtime "' + module.params['runtime'] + '"'
@@ -305,7 +307,7 @@ def create_or_update_cloudhub_application(module, cmd_base, context):
     # add application name and file path
     cmd_final += ' ' + module.params['name']
     cmd_final += ' ' + module.params['file']
-    
+
     # execute anypoint-cli command and save the output
     output = execute_anypoint_cli(module, cmd_final)
     return_value['msg'] = 'applicationis being deployed'
@@ -313,8 +315,9 @@ def create_or_update_cloudhub_application(module, cmd_base, context):
     cloudhub_app = get_application(module, cmd_base)
     return_value['app_url'] = cloudhub_app.get('fullDomain')
     return_value['app_status'] = cloudhub_app.get('status')
-    
+
     return return_value
+
 
 def start_cloudhub_application(module, cmd_base, context):
     return_value = dict(
@@ -372,10 +375,10 @@ def run_module():
         runtime=dict(type='str', required=False),
         workers=dict(type='int', required=False, default=1),
         worker_size=dict(type='str', required=False, default="0.1", choices=["0.1", "0.2", "1", "2", "4", "8", "16"]),
-        region=dict(type='str', 
-                    required=False, 
-                    default='us-east-1', 
-                    choices=["us-east-1", "us-east-2", "us-west-1", "us-west-2", "ca-central-1", "eu-west-1", "eu-central-1", 
+        region=dict(type='str',
+                    required=False,
+                    default='us-east-1',
+                    choices=["us-east-1", "us-east-2", "us-west-1", "us-west-2", "ca-central-1", "eu-west-1", "eu-central-1",
                              "eu-west-2", "ap-northeast-1", "ap-southeast-1", "ap-southeast-2", "sa-east-1"]),
         persistent_queues=dict(type='bool', required=False, default=False),
         persistent_queues_encripted=dict(type='bool', required=False, default=False),
