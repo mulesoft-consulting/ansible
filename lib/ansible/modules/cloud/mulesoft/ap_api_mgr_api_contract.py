@@ -68,7 +68,7 @@ requirements:
 
 EXAMPLES = '''
 # Example of creating an API Contract
-- name: delete an exchange application
+- name: create an API contract
   ap_api_mgr_contract:
     bearer": "00077d85-0dd7-4ee6-a63c-beb84080558f"
     name: "15722837"
@@ -78,7 +78,7 @@ EXAMPLES = '''
     application_id: "245525"
 
 # Example of revoking an API Contract
-- name: delete an exchange application
+- name: revoke an API contract
   ap_api_mgr_contract:
     bearer": "00077d85-0dd7-4ee6-a63c-beb84080558f"
     name: "15722837"
@@ -88,7 +88,7 @@ EXAMPLES = '''
     application_id: "245525"
 
 # Example of deleting an API Contract
-- name: delete an exchange application
+- name: delete an API contract
   ap_api_mgr_contract:
     bearer": "00077d85-0dd7-4ee6-a63c-beb84080558f"
     name: "15722837"
@@ -99,11 +99,11 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
-contract_id:
+id:
     description: API contract id
     type: string
     returned: success
-contract_status:
+status:
     description: API contract status
     type: string
     returned: success
@@ -350,8 +350,8 @@ def run_module():
 
     context = get_context(module)
 
-    result['contract_id'] = context['contract_id']
-    result['contract_status'] = context['contract_status']
+    result['id'] = context['contract_id']
+    result['status'] = context['contract_status']
 
     if (context['do_nothing'] is True):
         module.exit_json(**result)
@@ -364,8 +364,8 @@ def run_module():
         output = delete_contract(module, context)
 
     result['changed'] = True
-    result['contract_id'] = output['contract_id']
-    result['contract_status'] = output['contract_status']
+    result['id'] = output['contract_id']
+    result['status'] = output['contract_status']
     result['msg'] = output['msg']
 
     module.exit_json(**result)
