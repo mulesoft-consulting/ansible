@@ -46,14 +46,10 @@ options:
         description:
             - Exchange application description
         required: false
-        default: false
-        choices: [ "true", "false" ]
     url:
         description:
             - Exchange application URL
         required: false
-        default: false
-        choices: [ "true", "false" ]
 
 author:
     - Gonzalo Camino (@gonzalo-camino)
@@ -81,15 +77,15 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
-app_id:
+id:
     description: Application id
     type: string
     returned: success
-app_client_id:
+client_id:
     description: Application id
     type: string
     returned: success
-app_client_secret:
+client_secret:
     description: Application id
     type: string
     returned: success
@@ -139,7 +135,6 @@ def get_application_by_id(module, org_id, app_id):
     my_url = get_exchange_url(module, org_id) + '/applications/' + app_id
     headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
     output = json.load(execute_http_call(module, my_url, 'GET', headers, None))
-    print(output)
 
     return output
 
@@ -151,7 +146,7 @@ def get_existing_apps(module, org_id):
     return execute_http_call(module, my_url, 'GET', headers, None)
 
 
-def do_no_action(module):
+def get_context(module):
     return_value = dict(
         do_nothing=False,
         org_id=None,
@@ -171,7 +166,7 @@ def do_no_action(module):
         if (item['name'] == module.params['name']):
             app_exists = True
             result = get_application_by_id(module, return_value['org_id'], str(item['id']))
-            return_value['app_id'] = result['id']
+            return_value['app_id'] = str(result['id'])
             return_value['app_client_id'] = result['clientId']
             return_value['app_client_secret'] = result['clientSecret']
             url = item['url']
@@ -284,9 +279,9 @@ def run_module():
     result = dict(
         changed=False,
         msg='No action taken',
-        app_id=None,
-        app_client_id=None,
-        app_client_secret=None
+        id=None,
+        client_id=None,
+        client_secret=None
     )
 
     module = AnsibleModule(
@@ -304,10 +299,10 @@ def run_module():
         module.exit_json(**result)
 
     # exit if I need to do nothing, so check if environment exists
-    context = do_no_action(module)
-    result['app_id'] = context['app_id']
-    result['app_client_id'] = context['app_client_id']
-    result['app_client_secret'] = context['app_client_secret']
+    context = get_context(module)
+    result['id'] = context['app_id']
+    result['client_id'] = context['app_client_id']
+    result['client_secret'] = context['app_client_secret']
 
     if (context['do_nothing'] is True):
         module.exit_json(**result)
@@ -321,10 +316,10 @@ def run_module():
         output = delete_exchange_app(module, context)
 
     result['changed'] = True
-    result['app_id'] = output['app_id']
-    result['app_client_id'] = output['app_client_id']
-    result['app_client_secret'] = output['app_client_secret']
-    result['msg'] = output
+    result['id'] = output['app_id']
+    result['client_id'] = output['app_client_id']
+    result['client_secret'] = output['app_client_secret']
+    result['msg'] = output['output']
     module.exit_json(**result)
 
 
