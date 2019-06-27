@@ -202,7 +202,6 @@ def get_context(module):
 
     return_value['env_id'] = get_environment_id(module)
     client_list = json.load(get_api_contracts(module, return_value['env_id']))['contracts']
-
     for item in client_list:
         if (str(item['applicationId']) == module.params['application_id']):
             return_value['contract_id'] = str(item['id'])
@@ -328,8 +327,8 @@ def run_module():
 
     result = dict(
         changed=False,
-        contract_id=None,
-        contract_status=None,
+        id=None,
+        status=None,
         msg='No action taken'
     )
 

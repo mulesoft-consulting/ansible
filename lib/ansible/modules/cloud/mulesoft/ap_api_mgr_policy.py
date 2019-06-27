@@ -138,7 +138,7 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
-policy_id:
+id:
     description: Policy ID
     type: string
     returned: success
@@ -206,15 +206,18 @@ def get_applied_policies(module, cmd_base):
 
     return return_value
 
+def need_to_update_configuration(module, policy_configuration):
+    return True
 
-def do_no_action(module, cmd_base):
+
+def get_context(module, cmd_base):
     return_value = dict(
         do_nothing=False,
         policy_id=None,
         policy_asset_version=None,
         policy_enabled=False
     )
-
+    policy_configuration = None
     list_applied_policies = get_applied_policies(module, cmd_base)
     # check if the API is already managed
     if (list_applied_policies is not None):
@@ -223,8 +226,13 @@ def do_no_action(module, cmd_base):
                 return_value['policy_id'] = str(item['ID'])
                 return_value['policy_asset_version'] = item['Asset Version']
                 return_value['policy_enabled'] = (item['Status'] == 'Enabled')
+                policy_configuration = item['Configuration']
 
-    if (module.params['state'] == "enabled"):
+    if (module.params['state'] == "present"):
+        if (return_value['policy_id'] is not None):
+            if (need_to_update_configuration(module, policy_configuration) is False):
+                return_value['do_nothing'] = True
+    elif (module.params['state'] == "enabled"):
         if (return_value['policy_id'] is None):
             module.fail_json(msg='enabled state requires an existing policy applied')
         return_value['do_nothing'] = (return_value['policy_enabled'] is True)
@@ -348,7 +356,7 @@ def run_module():
     result = dict(
         changed=False,
         msg='No action taken',
-        policy_id=None
+        id=None
     )
 
     module = AnsibleModule(
@@ -369,7 +377,8 @@ def run_module():
     cmd_base = cmd
 
     # exit if I need to do nothing
-    context = do_no_action(module, cmd_base)
+    context = get_context(module, cmd_base)
+    result['id'] = context['policy_id']
     if (context['do_nothing'] is True):
         module.exit_json(**result)
 
@@ -391,7 +400,7 @@ def run_module():
 
     result['msg'] = op_result
     result['changed'] = True
-    result['policy_id'] = context['policy_id']
+    result['id'] = context['policy_id']
 
     module.exit_json(**result)
 
