@@ -163,7 +163,7 @@ def get_anypointcli_path(module):
 
 
 def execute_http_call(module, url, method, headers, payload):
-    return_Value = None
+    return_value = None
     try:
         if (headers is not None):
             if (payload is not None):

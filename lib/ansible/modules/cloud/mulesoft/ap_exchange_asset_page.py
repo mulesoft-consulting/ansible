@@ -192,10 +192,10 @@ def run_module():
     if (do_no_action(module) is True):
         module.exit_json(**result)
 
-    other_args = ' ' + module.params['name']
+    other_args = " '" + module.params['name'] + "'"
     if (module.params['state'] == 'present'):
         action = 'upload'
-        other_args += ' ' + module.params['md_path']
+        other_args += " '"  + module.params['md_path'] + "'"
     elif (module.params['state'] == 'absent'):
         action = 'delete'
 
