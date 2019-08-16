@@ -42,6 +42,9 @@ options:
             - The host of your Anypoint Platform Installation
         required: false
         default: anypoint.mulesoft.com
+    parent_id:
+        description:
+            - The org id of the parent (if empty then master org is default)
     create_suborgs:
         description:
             - Enable creating subOrgs
@@ -131,19 +134,19 @@ EXAMPLES = '''
 RETURN = '''
 id:
     description: Created business group id
-    type: string
+    type: str
     returned: success
 client_id:
     description: Created business group clientId
-    type: string
+    type: str
     returned: success
 client_secret:
     description: Created business group clientSecret
-    type: string
+    type: str
     returned: success
 msg:
     description: Anypoint CLI command output
-    type: string
+    type: str
     returned: always
 '''
 
@@ -157,8 +160,16 @@ def get_anypointcli_path(module):
     return module.get_bin_path('anypoint-cli', True, ['/usr/local/bin'])
 
 
+def execute_anypoint_cli(module, cmd):
+    result = module.run_command(cmd)
+    if result[0] != 0:
+        module.fail_json(msg=result[1].replace('\n', ''))
+
+    return result[1]
+
+
 def execute_http_call(module, url, method, headers, payload):
-    return_Value = None
+    return_value = None
     try:
         if (headers is not None):
             if (payload is not None):
@@ -177,7 +188,6 @@ def get_business_group_client_secret(module, bg_id, bg_client_id):
     server_name = 'https://' + module.params['host']
     api_endpoint = '/accounts/api/organizations/' + bg_id + '/clients/' + bg_client_id
     my_url = server_name + api_endpoint
-    user_id = get_user_id(module)
 
     headers = {
         'Accept': 'application/json',
@@ -185,40 +195,15 @@ def get_business_group_client_secret(module, bg_id, bg_client_id):
     }
 
     resp_json = json.load(execute_http_call(module, my_url, 'GET', headers, None))
+    return_value = resp_json['client_secret']
 
-    return resp_json['client_secret']
+    return return_value
 
 
-def do_no_action(module):
-    return_value = dict(
-        master_id=None,
-        target_id=None,
-        target_client_id=None,
-        target_client_secret=None
-    )
-    bearer_arg = '--bearer="' + module.params['bearer'] + '"'
-    host_arg = '--host="' + module.params['host'] + '"'
-    args = 'account business-group list --output json'
-    cmd = get_anypointcli_path(module) + ' ' + bearer_arg + ' ' + host_arg + ' ' + args
-    result = module.run_command(cmd)
-
-    if result[0] != 0:
-        return_value['msg'] = result[1]
-        module.fail_json(msg=result[1])
-
-    resp_json = json.loads(result[1])
-
-    for item in resp_json:
-        if (item['Type'] == 'Master'):
-            return_value['master_id'] = item['Id']
-            break
-
-    # check if business group exists
-    # I call the API instead of using anypoint-cli output because I found that after deleting
-    # a BG, the list operation is still showing it
-    # https://www.mulesoft.org/jira/browse/APC-23
+def get_organization(module, org_id):
+    return_value = None
     server_name = 'https://' + module.params['host']
-    api_endpoint = '/accounts/api/organizations/' + return_value['master_id'] + '/hierarchy'
+    api_endpoint = '/accounts/api/organizations/' + org_id
     my_url = server_name + api_endpoint
 
     headers = {
@@ -226,41 +211,91 @@ def do_no_action(module):
         'Authorization': 'bearer ' + module.params['bearer']
     }
 
-    resp_json = json.load(execute_http_call(module, my_url, 'GET', headers, None))
+    return_value = json.load(execute_http_call(module, my_url, 'GET', headers, None))
 
-    for item in resp_json['subOrganizations']:
-        if (item['name'] == module.params['name']):
-            return_value['target_id'] = item['id']
-            return_value['target_client_id'] = item['clientId']
-            return_value['target_client_secret'] = get_business_group_client_secret(module, item['id'], item['clientId'])
+    return return_value
 
-            break
+
+def get_business_group_need_update(module, bg):
+    return_value = False
+    if ((bg.get('entitlements').get('createSubOrgs') != module.params['create_suborgs'])
+            or (bg.get('entitlements').get('createEnvironments') != module.params['create_environments'])
+            or (bg.get('entitlements').get('globalDeployment') != module.params['global_deployment'])
+            or (bg.get('entitlements').get('vCoresProduction').get('assigned') != module.params['vcores_production'])
+            or (bg.get('entitlements').get('vCoresSandbox').get('assigned') != module.params['vcores_sandbox'])
+            or (bg.get('entitlements').get('vCoresDesign').get('assigned') != module.params['vcores_design'])
+            or (bg.get('entitlements').get('staticIps').get('assigned') != module.params['static_ips'])
+            or (bg.get('entitlements').get('vpcs').get('assigned') != module.params['vpcs'])
+            or (bg.get('entitlements').get('loadBalancer').get('assigned') != module.params['load_balancer'])
+            or (bg.get('entitlements').get('vpns').get('assigned') != module.params['vpns'])):
+        return_value = True
+
+    return return_value
+
+
+def get_context(module):
+    return_value = dict(
+        parent_id=None,
+        target_id=None,
+        target_client_id=None,
+        target_client_secret=None,
+        do_nothing=False,
+        needs_update=False
+    )
+    bearer_arg = '--bearer="' + module.params['bearer'] + '"'
+    host_arg = '--host="' + module.params['host'] + '"'
+    args = 'account business-group list --output json'
+    cmd = get_anypointcli_path(module) + ' ' + bearer_arg + ' ' + host_arg + ' ' + args
+    result = execute_anypoint_cli(module, cmd)
+
+    resp_json = json.loads(result)
+
+    for item in resp_json:
+        if (module.params['parent_id'] is None or module.params['parent_id'] == ''):
+            if (item['Type'] == 'Master'):
+                return_value['parent_id'] = item['Id']
+                break
+        else:
+            if (item['Id'] == module.params['parent_id']):
+                return_value['parent_id'] = item['Id']
+                break
+
+    # check if business group exists within parent subOrgs
+    if (return_value['parent_id'] is not None):
+        parent = get_organization(module, return_value['parent_id'])
+        for child_id in parent['subOrganizationIds']:
+            child = get_organization(module, child_id)
+            if (child['name'] == module.params['name']):
+                return_value['target_id'] = child['id']
+                return_value['target_client_id'] = child['clientId']
+                return_value['target_client_secret'] = get_business_group_client_secret(module, child['id'], child['clientId'])
+                return_value['needs_update'] = get_business_group_need_update(module, child)
+                break
+
+    # finally check if need to do something
+    if (module.params['state'] == 'present'):
+        return_value['do_nothing'] = (return_value['target_id'] is not None and return_value['needs_update'] is False)
+    elif (module.params['state'] == 'absent'):
+        return_value['do_nothing'] = (return_value['target_id'] is None)
 
     return return_value
 
 
 def get_user_id(module):
-    return_value = ''
-    bearer_arg = '--bearer="' + module.params['bearer'] + '"'
-    host_arg = '--host="' + module.params['host'] + '"'
-    args = 'account user describe --output json'
-    cmd = get_anypointcli_path(module) + ' ' + bearer_arg + ' ' + host_arg + ' ' + args
-
-    result = module.run_command(cmd)
-    if result[0] != 0:
-        module.fail_json(msg=result[1])
-
-    # check if the environment exists
-    if len(result[1]) > 2:
-        resp_json = json.loads(result[1])
-        return_value = resp_json['Id']
-    else:
-        module.fail_json(msg='Unknown error')
+    server_name = 'https://' + module.params['host']
+    api_endpoint = '/accounts/api/profile'
+    my_url = server_name + api_endpoint
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'bearer ' + module.params['bearer']
+    }
+    resp_json = json.load(execute_http_call(module, my_url, 'GET', headers, None))
+    return_value = resp_json.get('id')
 
     return return_value
 
 
-def create_business_group(module, master_id):
+def create_business_group(module, context):
     return_value = dict(
         bg_id=None,
         bg_client_id=None,
@@ -277,7 +312,7 @@ def create_business_group(module, master_id):
     }
     payload = {
         "name": module.params['name'],
-        "parentOrganizationId": master_id,
+        "parentOrganizationId": context['parent_id'],
         "ownerId": user_id,
         "entitlements": {
             "createSubOrgs": module.params['create_suborgs'],
@@ -316,9 +351,64 @@ def create_business_group(module, master_id):
     return return_value
 
 
-def delete_business_group(module, target_id):
+def update_business_group(module, context):
+    return_value = dict(
+        bg_id=None,
+        bg_client_id=None,
+        bg_client_secret=None
+    )
     server_name = 'https://' + module.params['host']
-    api_endpoint = '/accounts/api/organizations/' + target_id
+    api_endpoint = '/accounts/api/organizations/' + context['target_id']
+    my_url = server_name + api_endpoint
+    user_id = get_user_id(module)
+
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'bearer ' + module.params['bearer']
+    }
+    payload = {
+        "name": module.params['name'],
+        "ownerId": user_id,
+        "entitlements": {
+            "createSubOrgs": module.params['create_suborgs'],
+            "createEnvironments": module.params['create_environments'],
+            "globalDeployment": module.params['global_deployment'],
+            "vCoresProduction": {
+                "assigned": module.params['vcores_production']
+            },
+            "vCoresSandbox": {
+                "assigned": module.params['vcores_sandbox']
+            },
+            "vCoresDesign": {
+                "assigned": module.params['vcores_design']
+            },
+            "staticIps": {
+                "assigned": module.params['static_ips']
+            },
+            "vpcs": {
+                "assigned": module.params['vpcs']
+            },
+            "loadBalancer": {
+                "assigned": module.params['load_balancer']
+            },
+            "vpns": {
+                "assigned": module.params['vpns']
+            }
+        }
+    }
+
+    resp_json = json.load(execute_http_call(module, my_url, 'PUT', headers, json.dumps(payload)))
+
+    return_value['bg_id'] = resp_json["id"]
+    return_value['bg_client_id'] = resp_json["clientId"]
+    return_value['bg_client_secret'] = get_business_group_client_secret(module, resp_json["id"], resp_json["clientId"])
+
+    return return_value
+
+
+def delete_business_group(module, context):
+    server_name = 'https://' + module.params['host']
+    api_endpoint = '/accounts/api/organizations/' + context['target_id']
     my_url = server_name + api_endpoint
 
     headers = {
@@ -335,9 +425,10 @@ def run_module():
         name=dict(type='str', required=True),
         state=dict(type='str', required=True, choices=["present", "absent"]),
         host=dict(type='str', required=False, default='anypoint.mulesoft.com'),
-        create_suborgs=dict(type='bool', required=False, default=False),
-        create_environments=dict(type='bool', required=False, default=False),
-        global_deployment=dict(type='bool', required=False, default=False),
+        parent_id=dict(type='str', required=False),
+        create_suborgs=dict(type='bool', required=False, default=False, choices=[False, True]),
+        create_environments=dict(type='bool', required=False, default=False, choices=[False, True]),
+        global_deployment=dict(type='bool', required=False, default=False, choices=[False, True]),
         vcores_production=dict(type='float', required=False, default=0),
         vcores_sandbox=dict(type='float', required=False, default=0),
         vcores_design=dict(type='float', required=False, default=0),
@@ -370,29 +461,31 @@ def run_module():
         module.exit_json(**result)
 
     # exit if I need to do nothing, so check if environment exists
-    context = do_no_action(module)
+    context = get_context(module)
+    result['id'] = context['target_id']
+    result['client_id'] = context['target_client_id']
+    result['client_secret'] = context['target_client_secret']
+
+    if (context['do_nothing'] is True):
+        module.exit_json(**result)
+
+    if (context['parent_id'] is None):
+        module.fail_json(msg="parent org not found")
 
     if (module.params['state'] == 'present'):
-        if (context['target_id'] is not None):
-            # do nothing
-            result['id'] = context['target_id']
-            result['client_id'] = context['target_client_id']
-            result['client_secret'] = context['target_client_secret']
-            module.exit_json(**result)
-        else:
-            output = create_business_group(module, context['master_id'])
-
+        if (context['needs_update'] is False):
+            output = create_business_group(module, context)
             result['changed'] = True
             result['id'] = output['bg_id']
             result['client_id'] = output['bg_client_id']
             result['client_secret'] = output['bg_client_secret']
             result['msg'] = 'Business Group created'
-
+        else:
+            output = update_business_group(module, context)
+            result['changed'] = True
+            result['msg'] = 'Business Group updated'
     elif (module.params['state'] == 'absent'):
-        if context['target_id'] is None:
-            # do nothing
-            module.exit_json(**result)
-        delete_business_group(module, context['target_id'])
+        delete_business_group(module, context)
         result['changed'] = True
         result['id'] = None
         result['client_id'] = None
