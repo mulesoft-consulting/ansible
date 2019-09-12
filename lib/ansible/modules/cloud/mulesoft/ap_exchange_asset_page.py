@@ -29,7 +29,7 @@ options:
             - Asset page name. Naming the page [home] makes the uploaded page the main description page for the Exchange asset
     state:
         description:
-            - Assert the state of the page. Use Use C(present) to create a page and C(absent) to delete it.
+            - Assert the state of the page. Use C(present) to create a page and C(absent) to delete it.
         required: true
         choices: [ "present", absent" ]
     bearer:
@@ -60,7 +60,7 @@ options:
         default: 1.0.0
     md_path:
         description:
-            - Path to the markdown page file
+            - Path to the markdown page file. Required for C(present)
 
 author:
     - Gonzalo Camino (@gonzalo-camino)
@@ -83,7 +83,7 @@ EXAMPLES = '''
     md_path: '/tmp/home.md'
 
 # Example of deleting exchange asset main page
-- name: Upload Exchange Page
+- name: Delete Exchange Page
   ap_exchange_asset_page:
     name: 'home'
     state: 'absent'
@@ -195,7 +195,7 @@ def run_module():
     other_args = " '" + module.params['name'] + "'"
     if (module.params['state'] == 'present'):
         action = 'upload'
-        other_args += " '"  + module.params['md_path'] + "'"
+        other_args += " '" + module.params['md_path'] + "'"
     elif (module.params['state'] == 'absent'):
         action = 'delete'
 

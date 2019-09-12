@@ -123,11 +123,10 @@ LIB_IMP_ERR = None
 try:
     import requests
     HAS_LIB = True
-except:
+except Exception:
     HAS_LIB = False
     LIB_IMP_ERR = traceback.format_exc()
 
-#from pprint import pprint
 from ansible.module_utils.basic import missing_required_lib
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.urls import open_url
@@ -319,8 +318,7 @@ def run_module():
     )
 
     if not HAS_LIB:
-        module.fail_json(msg=missing_required_lib("requests"),
-                     exception=LIB_IMP_ERR)
+        module.fail_json(msg=missing_required_lib("requests"), exception=LIB_IMP_ERR)
     # if the user is working with this module in only check mode we do not
     # want to make any changes to the environment, just return the current
     # state with no modifications

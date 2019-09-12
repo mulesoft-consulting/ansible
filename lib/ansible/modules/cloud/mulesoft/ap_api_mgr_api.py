@@ -209,16 +209,13 @@ def check_if_update_needed(module, cmd_base, api_instance_id):
     return return_value
 
 
-def do_no_action(module, cmd_base):
+def get_context(module, cmd_base):
     return_value = dict(
         do_nothing=False,
         api_managed=False,
         api_deprecated=False,
         api_instance_id=None
     )
-    api_managed = False
-    api_deprecated = False
-    api_instance_id = None
     cmd_final = cmd_base
     cmd_final += ' list --output json'
 
@@ -227,7 +224,8 @@ def do_no_action(module, cmd_base):
     if result[0] != 0:
         module.fail_json(msg=result[1])
 
-    if not result[1].strip(): return return_value
+    if not result[1].strip():
+        return return_value
 
     resp_json = json.loads(result[1])
     # check if the API is already managed
@@ -420,7 +418,7 @@ def run_module():
     cmd_base = cmd
 
     # exit if I need to do nothing
-    context = do_no_action(module, cmd_base)
+    context = get_context(module, cmd_base)
     result['api_instance_id'] = context['api_instance_id']
 
     if (context['do_nothing'] is True):

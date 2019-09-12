@@ -115,7 +115,7 @@ LIB_IMP_ERR = None
 try:
     import requests
     HAS_LIB = True
-except:
+except Exception:
     HAS_LIB = False
     LIB_IMP_ERR = traceback.format_exc()
 
@@ -201,7 +201,7 @@ def create_resource(module):
         resp_json = json.loads(resp.text)
     except Exception as e:
         module.fail_json(msg='[create_resource] ' + str(e))
-    
+
     return_value['resource_url'] = resp_json["path"]
 
     return return_value
@@ -244,8 +244,7 @@ def run_module():
         supports_check_mode=True
     )
     if not HAS_LIB:
-        module.fail_json(msg=missing_required_lib("requests"),
-                     exception=LIB_IMP_ERR)
+        module.fail_json(msg=missing_required_lib("requests"), exception=LIB_IMP_ERR)
     # Main Module Logic
 
     # validations pre check_mode
@@ -258,7 +257,7 @@ def run_module():
     # exit if I need to do nothing, so check if environment exists
     context = get_context(module)
     result['url'] = context['resource_url']
-    if ( context['do_nothing'] is True):
+    if (context['do_nothing'] is True):
         module.exit_json(**result)
 
     output = None
@@ -266,7 +265,6 @@ def run_module():
         output = create_resource(module)
     elif (module.params['state'] == 'absent'):
         output = delete_resource(module, result['url'])
-
 
     result['msg'] = output['msg']
     result['url'] = output['resource_url']

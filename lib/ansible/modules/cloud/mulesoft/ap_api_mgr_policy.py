@@ -206,6 +206,7 @@ def get_applied_policies(module, cmd_base):
 
     return return_value
 
+
 def need_to_update_configuration(module, policy_configuration):
     return True
 

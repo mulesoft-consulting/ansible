@@ -166,7 +166,7 @@ def get_existing_clients(module, env_id):
     return execute_http_call(module, my_url, 'GET', headers, None)
 
 
-def do_no_action(module):
+def get_context(module):
     return_value = dict(
         do_nothing=False,
         env_id=None,
@@ -276,7 +276,7 @@ def run_module():
     if (module.params['organization_id'] is None):
         module.params['organization_id'] = get_org_id(module)
 
-    context = do_no_action(module)
+    context = get_context(module)
 
     result['mq_client_app_id'] = context['mq_client_app_id']
     result['mq_client_app_client_id'] = context['mq_client_app_client_id']

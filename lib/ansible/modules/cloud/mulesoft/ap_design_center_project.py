@@ -179,7 +179,7 @@ def execute_http_call(module, url, method, headers, payload):
 
 def do_no_action_design_center(module, cmd_base):
     return_value = None
-    cmd_final = cmd_base + ' list --output json --pageIndex 0 --pageSize 500' 
+    cmd_final = cmd_base + ' list --output json --pageIndex 0 --pageSize 500'
     cmd_final += ' "' + module.params['name'] + '"'
 
     result = module.run_command(cmd_final)
