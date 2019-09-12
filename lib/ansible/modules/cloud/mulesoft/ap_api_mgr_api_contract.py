@@ -14,14 +14,14 @@ ANSIBLE_METADATA = {
 
 DOCUMENTATION = '''
 ---
-module: ap_api_mgr_contract
+module: ap_api_mgr_api_contract
 
 short_description: Manage API Contracts on Anypoint API Manager
 
 version_added: "2.8"
 
 description:
-    - "This module supports management of contracts over managed APIs at Environment level on Anypoint API Manager"
+    - "This module supports management of API Contracts over managed APIs at Environment level on Anypoint API Manager"
 
 options:
     name:
@@ -30,9 +30,9 @@ options:
         required: true
     state:
         description:
-            - Assert the state of the application. Use Use C(present) to create an application and C(absent) to delete it.
+            - Assert the state of the application. Use Use C(present) to create an application,  C(revoked) to revoke it and C(absent) to delete it.
         required: true
-        choices: [ "present", "revoked", absent" ]
+        choices: [ "present", "revoked", "absent" ]
     bearer:
         description:
             - Anypoint Platform access token for an active session
@@ -69,7 +69,7 @@ requirements:
 EXAMPLES = '''
 # Example of creating an API Contract
 - name: create an API contract
-  ap_api_mgr_contract:
+  ap_api_mgr_api_contract:
     bearer": "00077d85-0dd7-4ee6-a63c-beb84080558f"
     name: "15722837"
     state: "present"
@@ -79,7 +79,7 @@ EXAMPLES = '''
 
 # Example of revoking an API Contract
 - name: revoke an API contract
-  ap_api_mgr_contract:
+  ap_api_mgr_api_contract:
     bearer": "00077d85-0dd7-4ee6-a63c-beb84080558f"
     name: "15722837"
     state: "revoked"
@@ -89,7 +89,7 @@ EXAMPLES = '''
 
 # Example of deleting an API Contract
 - name: delete an API contract
-  ap_api_mgr_contract:
+  ap_api_mgr_api_contract:
     bearer": "00077d85-0dd7-4ee6-a63c-beb84080558f"
     name: "15722837"
     state: "absent"
@@ -101,15 +101,15 @@ EXAMPLES = '''
 RETURN = '''
 id:
     description: API contract id
-    type: string
+    type: str
     returned: success
 status:
     description: API contract status
-    type: string
+    type: str
     returned: success
 msg:
     description: Anypoint CLI command output
-    type: string
+    type: str
     returned: always
 '''
 

@@ -94,8 +94,7 @@ options:
         description:
             - Enable or disable static IPs. Can take C(Enabled) or C(Disabled) values
         required: false
-        choices: [ "Enabled", "Disabled" ]
-        default: 'Disabled'
+        default: false
     object_store_v1:
         description:
             - Enable or disable Object Store V1. Can take C(true) or C(false) values
@@ -123,7 +122,7 @@ requirements:
    - anypoint-cli
 '''
 
-EXAMPLES = '''
+EXAMPLES = r'''
 # Create a fragment project on design center
 - name: Create a fragment project on design center
   ap_runtime_mgr_cloudhub_application:
@@ -139,8 +138,8 @@ EXAMPLES = '''
     region: 'us-west-1'
     auto_start: true
     properties:
-        - "db.user\\=oliver"
-        - "db.pswd\\=queen"
+        - 'db.user\=oliver'
+        - 'db.pswd\=queen'
 
 # Stop an application from Runtime Manager
 - name: Stop an application from Runtime Manager
@@ -173,11 +172,11 @@ EXAMPLES = '''
 RETURN = '''
 url:
     description: application url
-    type: string
+    type: str
     returned: always
 msg:
     description: Anypoint CLI command output
-    type: string
+    type: str
     returned: always
 '''
 

@@ -146,7 +146,7 @@ EXAMPLES = '''
 RETURN = '''
 msg:
     description: Anypoint CLI command output
-    type: string
+    type: str
     returned: always
 '''
 

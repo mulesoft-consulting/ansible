@@ -82,21 +82,21 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
-mq_client_app_id:
+id:
     description: Application id
-    type: string
+    type: str
     returned: success
-mq_client_app_client_id:
+client_id:
     description: Application id
-    type: string
+    type: str
     returned: success
-mq_client_app_client_secret:
+client_secret:
     description: Application id
-    type: string
+    type: str
     returned: success
 msg:
     description: Anypoint CLI command output
-    type: string
+    type: str
     returned: always
 '''
 
@@ -256,9 +256,9 @@ def run_module():
     result = dict(
         changed=False,
         msg='No action taken',
-        mq_client_app_id=None,
-        mq_client_client_id=None,
-        mq_client_client_secret=None
+        id=None,
+        client_id=None,
+        client_secret=None
     )
 
     module = AnsibleModule(
@@ -278,9 +278,9 @@ def run_module():
 
     context = get_context(module)
 
-    result['mq_client_app_id'] = context['mq_client_app_id']
-    result['mq_client_app_client_id'] = context['mq_client_app_client_id']
-    result['mq_client_app_client_secret'] = context['mq_client_app_client_secret']
+    result['id'] = context['mq_client_app_id']
+    result['client_id'] = context['mq_client_app_client_id']
+    result['client_secret'] = context['mq_client_app_client_secret']
 
     if (context['do_nothing'] is True):
         module.exit_json(**result)
@@ -291,9 +291,9 @@ def run_module():
         output = delete_mq_client(module, context)
 
     result['changed'] = True
-    result['mq_client_app_id'] = output['mq_client_app_id']
-    result['mq_client_app_client_id'] = output['mq_client_app_client_id']
-    result['mq_client_app_client_secret'] = output['mq_client_app_client_secret']
+    result['id'] = output['mq_client_app_id']
+    result['client_id'] = output['mq_client_app_client_id']
+    result['client_secret'] = output['mq_client_app_client_secret']
     result['msg'] = output['msg']
 
     module.exit_json(**result)

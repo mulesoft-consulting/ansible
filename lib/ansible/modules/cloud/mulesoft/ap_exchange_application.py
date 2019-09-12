@@ -79,19 +79,19 @@ EXAMPLES = '''
 RETURN = '''
 id:
     description: Application id
-    type: string
+    type: str
     returned: success
 client_id:
     description: Application id
-    type: string
+    type: str
     returned: success
 client_secret:
     description: Application id
-    type: string
+    type: str
     returned: success
 msg:
     description: Anypoint CLI command output
-    type: string
+    type: str
     returned: always
 '''
 

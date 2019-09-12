@@ -140,11 +140,11 @@ EXAMPLES = '''
 RETURN = '''
 id:
     description: Policy ID
-    type: string
+    type: str
     returned: success
 msg:
     description: Anypoint CLI command output
-    type: string
+    type: str
     returned: always
 '''
 

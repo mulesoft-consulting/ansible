@@ -31,7 +31,7 @@ options:
         description:
             - Assert the state of the page. Use C(present) to create a page and C(absent) to delete it.
         required: true
-        choices: [ "present", absent" ]
+        choices: [ "present", "absent" ]
     bearer:
         description:
             - Anypoint Platform access token for an active session
@@ -97,11 +97,11 @@ EXAMPLES = '''
 RETURN = '''
 url:
     description: URL to asset resource
-    type: string
+    type: str
     returned: always
 msg:
     description: Anypoint CLI command output
-    type: string
+    type: str
     returned: always
 '''
 

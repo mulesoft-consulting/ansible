@@ -52,11 +52,11 @@ EXAMPLES = '''
 RETURN = '''
 access_token:
     description: The bearer token obtained from Anypoint Platform
-    type: string
+    type: str
     returned: success
 msg:
     description: The output message that the module generates
-    type: string
+    type: str
     returned: always
 '''
 

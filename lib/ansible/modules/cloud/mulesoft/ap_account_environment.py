@@ -91,19 +91,19 @@ EXAMPLES = '''
 RETURN = '''
 id:
     description: Id for the environment
-    type: string
+    type: str
     returned: always
 client_id:
     description: Client id for the environment
-    type: string
+    type: str
     returned: always
 client_secret:
     description: Client secret for the environment
-    type: string
+    type: str
     returned: always
 msg:
     description: Anypoint CLI command output
-    type: string
+    type: str
     returned: always
 '''
 

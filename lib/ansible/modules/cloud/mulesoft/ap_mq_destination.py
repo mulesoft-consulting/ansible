@@ -14,7 +14,7 @@ ANSIBLE_METADATA = {
 
 DOCUMENTATION = '''
 ---
-module: ap_mq_client
+module: ap_mq_destination
 
 short_description: Manage Destinations on Anypoint MQ
 
@@ -159,13 +159,13 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
-destination_id:
+id:
     description: Destination id
-    type: string
+    type: str
     returned: success
 msg:
     description: Anypoint CLI command output
-    type: string
+    type: str
     returned: always
 '''
 
@@ -384,7 +384,7 @@ def run_module():
     result = dict(
         changed=False,
         msg='No action taken',
-        queue_id=None
+        id=None
     )
 
     module = AnsibleModule(
@@ -404,7 +404,7 @@ def run_module():
 
     context = get_context(module)
 
-    result['destination_id'] = context['destination_id']
+    result['id'] = context['destination_id']
 
     if (context['do_nothing'] is True):
         module.exit_json(**result)
@@ -418,7 +418,7 @@ def run_module():
         output = delete_mq_destination(module, context)
 
     result['changed'] = True
-    result['destination_id'] = output['destination_id']
+    result['id'] = output['destination_id']
     result['msg'] = output['msg']
 
     module.exit_json(**result)

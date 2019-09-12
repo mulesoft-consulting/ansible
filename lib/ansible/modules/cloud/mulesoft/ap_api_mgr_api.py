@@ -32,7 +32,7 @@ options:
         description:
             - Assert the state of the managed API. Use C(present) to create an API, C(deprecated) to deprecate it and C(absent) to delete it.
         required: true
-        choices: [ "present", "deprecated", absent" ]
+        choices: [ "present", "deprecated", "absent" ]
     asset_version:
         description:
             - The assets version in Exchange
@@ -70,7 +70,7 @@ options:
         description:
             - Indicates whether a proxy should reference a user domain
         required: false
-        defualt: false
+        default: false
     mule_4:
         description:
             - Indicates whether you are managing this API in Mule 4 or above
@@ -162,13 +162,13 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
-api_instance_id:
+instance_id:
     description: API Instance ID
-    type: string
+    type: str
     returned: always
 msg:
     description: Anypoint CLI command output
-    type: string
+    type: str
     returned: always
 '''
 
@@ -397,6 +397,7 @@ def run_module():
 
     result = dict(
         changed=False,
+        instance_id=None,
         msg='No action taken'
     )
 
@@ -419,7 +420,7 @@ def run_module():
 
     # exit if I need to do nothing
     context = get_context(module, cmd_base)
-    result['api_instance_id'] = context['api_instance_id']
+    result['instance_id'] = context['api_instance_id']
 
     if (context['do_nothing'] is True):
         module.exit_json(**result)
@@ -450,7 +451,7 @@ def run_module():
         op_result = delete_api(module, cmd_base, context)
 
     result['msg'] = op_result['output']
-    result['api_instance_id'] = op_result['api_instance_id']
+    result['instance_id'] = op_result['api_instance_id']
     result['changed'] = True
 
     module.exit_json(**result)

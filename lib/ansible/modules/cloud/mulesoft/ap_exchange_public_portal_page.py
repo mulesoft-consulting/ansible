@@ -78,7 +78,7 @@ EXAMPLES = '''
 RETURN = '''
 msg:
     description: The output message that the module generates
-    type: string
+    type: str
     returned: always
 '''
 
