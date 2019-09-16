@@ -179,14 +179,15 @@ def replace_resource_names(module, filedata):
     for ocurrence in page_resources_to_replace:
         # here I expect a string like "![resources/chalo-2b5affd5-2584-4ccc-a46a-68aeb77806b5.jpg]""
         resource_name = ocurrence.replace('![', '').replace(']', '')
-        raw_resource_name = remove_uuid_from_resource_name(resource_name.replace('resources/',''))
+        raw_resource_name = remove_uuid_from_resource_name(resource_name.replace('resources/', ''))
         for uploaded_resource in resources_uploaded:
-            tmp = remove_uuid_from_resource_name(uploaded_resource['path'].replace('resources/',''))
+            tmp = remove_uuid_from_resource_name(uploaded_resource['path'].replace('resources/', ''))
             if (tmp == raw_resource_name):
                 filedata = filedata.replace(resource_name, uploaded_resource['path'])
                 break
 
     return filedata
+
 
 def page_content_must_change(module):
     # read data from existing object
@@ -208,13 +209,13 @@ def page_content_must_change(module):
         os.rmdir(tmp_dir)
     except Exception as e:
         module.fail_json(msg="[page_content_must_change] Deletion of the directory %s failed" % tmp_dir)
-    
+
     # read data from specified resource
     f = open(module.params['md_path'], 'r')
     file_data = f.read()
     f.close()
     file_data = replace_resource_names(module, file_data)
-    
+
     return (actual_data != file_data)
 
 
@@ -236,10 +237,8 @@ def get_context(module):
                 page_exists = True
 
     if (module.params['state'] == "present"):
-        if (page_exists == True):
-            return_value['do_nothing'] = not (page_content_must_change(module) == True)
-        # always upload content
-        # return_value['do_nothing'] = False
+        if (page_exists is True):
+            return_value['do_nothing'] = not (page_content_must_change(module) is True)
     elif (module.params['state'] == "absent"):
         return_value['do_nothing'] = not page_exists
 
@@ -253,7 +252,7 @@ def replace_resources_on_file(module, file_name):
     f.close()
     # replace content
     filedata = replace_resource_names(module, filedata)
-    # finally write file content 
+    # finally write file content
     f = open(file_name, 'w')
     f.write(filedata)
     f.close()
