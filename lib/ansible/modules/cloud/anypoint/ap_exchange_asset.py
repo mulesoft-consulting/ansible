@@ -16,7 +16,7 @@ DOCUMENTATION = '''
 ---
 module: ap_exchange_asset
 
-short_description: Manage the an Asset on Exchange
+short_description: Manage an Asset on Exchange
 
 version_added: "2.8"
 
@@ -74,7 +74,15 @@ options:
         default: 1.0.0
     main_file:
         description:
+            - Main file of the API asset.
+        type: path
+        required: false
+    file_path:
+        description:
             - Path to the asset file. Required for C(present)
+            - If points to a ZIP archive file, that archive must include an C(exchange.json) file describing the asset
+        type: path
+        required: false
     tags:
         description:
             - A list of tags for the asset
@@ -150,7 +158,6 @@ def get_asset_identifier(group_id, asset_id, asset_version):
 
 
 def execute_anypoint_cli(module, cmd):
-    print('[DEBUG] ' + cmd)
     result = module.run_command(cmd)
     if result[0] != 0:
         module.fail_json(msg=result[1])
@@ -269,9 +276,12 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
     upload_cmd = cmd_base
     upload_cmd += ' upload'
     upload_cmd += ' --name "' + module.params['name'] + '"'
-    upload_cmd += ' --mainFile "' + module.params['main_file'] + '"'
+    if (module.params['main_file'] is not None):
+        upload_cmd += ' --mainFile "' + module.params['main_file'] + '"'
     upload_cmd += ' --classifier "' + module.params['type'] + '"'
     upload_cmd += ' "' + asset_identifier + '"'
+    if (module.params['file_path'] is not None):
+        upload_cmd += ' "' + module.params['file_path'] + '"'
     execute_anypoint_cli(module, upload_cmd)
     if (module.params['tags']):
         modify_exchange_asset(module, cmd_base, asset_identifier)
@@ -294,6 +304,7 @@ def run_module():
         asset_version=dict(type='str', required=False, default="1.0.0"),
         api_version=dict(type='str', required=False, default="1.0"),
         main_file=dict(type='path', required=False, default=None),
+        file_path=dict(type='path', required=False, default=None),
         tags=dict(type='list', required=False, default=[])
     )
     result = dict(
@@ -310,10 +321,6 @@ def run_module():
     # first all check that the anypoint-cli binary is present on the host
     if (get_anypointcli_path(module) is None):
         module.fail_json(msg="anypoint-cli binary not present on host")
-
-    # validations pre check_mode
-    if (module.params['state'] == 'present') and (module.params['main_file'] is None):
-        module.fail_json(msg="present state requires 'main_file' argument")
 
     if module.check_mode:
         module.exit_json(**result)
