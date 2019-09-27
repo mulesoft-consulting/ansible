@@ -48,21 +48,21 @@ options:
     create_suborgs:
         description:
             - Enable creating subOrgs
+        type: bool
         required: false
         default: false
-        choices: [ "true", "false" ]
     create_environments:
         description:
             - Enable creating environments
+        type: bool
         required: false
         default: false
-        choices: [ "true", "false" ]
     global_deployment:
         description:
             - Enable global deployments
+        type: bool
         required: false
         default: false
-        choices: [ "true", "false" ]
     vcores_production:
         description:
             - Number of Production vCores assigner
@@ -210,8 +210,14 @@ def get_organization(module, org_id):
         'Content-Type': 'application/json',
         'Authorization': 'bearer ' + module.params['bearer']
     }
-
-    return_value = json.load(execute_http_call(module, my_url, 'GET', headers, None))
+    try:
+        return_value = json.load(open_url(url=my_url, method='GET', headers=headers))
+    except Exception as e:
+        error_str = str(e)
+        if (error_str == "HTTP Error 401: Unauthorized"):
+            return_value = {'name': None}
+        else:
+            module.fail_json(msg=error_str)
 
     return return_value
 
@@ -426,9 +432,9 @@ def run_module():
         state=dict(type='str', required=True, choices=["present", "absent"]),
         host=dict(type='str', required=False, default='anypoint.mulesoft.com'),
         parent_id=dict(type='str', required=False),
-        create_suborgs=dict(type='bool', required=False, default=False, choices=[False, True]),
-        create_environments=dict(type='bool', required=False, default=False, choices=[False, True]),
-        global_deployment=dict(type='bool', required=False, default=False, choices=[False, True]),
+        create_suborgs=dict(type='bool', required=False, default=False),
+        create_environments=dict(type='bool', required=False, default=False),
+        global_deployment=dict(type='bool', required=False, default=False),
         vcores_production=dict(type='float', required=False, default=0),
         vcores_sandbox=dict(type='float', required=False, default=0),
         vcores_design=dict(type='float', required=False, default=0),
