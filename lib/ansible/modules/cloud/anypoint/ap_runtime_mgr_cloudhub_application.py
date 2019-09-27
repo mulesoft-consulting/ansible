@@ -153,14 +153,19 @@ options:
             - Visualizer properties for the API
         required: false
         suboptions:
+            display_name:
+                description:
+                    - The display name for this application on visualizer.
+                    - This value will be added as a property to the properties list.
+                    - The property name is "anypoint.platform.visualizer.displayName"
             layer:
-                descirption:
+                description:
                     - The name of the visualizer layer for this application.
                     - This value will be added as a property to the properties list.
                     - The property name is "anypoint.platform.visualizer.layer"
                 required: false
             tags:
-                descirption:
+                description:
                     - The list of tags to set on visualizer
                     - This value will be added as a property to the properties list.
                     - The property name is "anypoint.platform.visualizer.tags"
@@ -416,6 +421,8 @@ def create_or_update_cloudhub_application(module, cmd_base, context):
                 cmd_final += ' --property "' + r'anypoint.platform.client_secret\=' + module.params['api_manager'].get('env_client_secret') + '"'
         # Visualizer related properties
         if (module.params.get('visualizer') is not None):
+            if (module.params['visualizer'].get('display_name') is not None):
+                cmd_final += ' --property "' + r'anypoint.platform.visualizer.displayName\=' + module.params['visualizer']['display_name'] + '"'
             if (module.params['visualizer'].get('layer') is not None):
                 cmd_final += ' --property "' + r'anypoint.platform.visualizer.layer\=' + module.params['visualizer']['layer'] + '"'
             if (module.params['visualizer'].get('tags') is not None):
@@ -499,6 +506,7 @@ def run_module():
 
     )
     visualizer_spec = dict(
+        display_name=dict(type='str', required=False),
         layer=dict(type='str', required=False),
         tags=dict(type='list', elements='str', required=False)
     )
@@ -573,7 +581,7 @@ def run_module():
         if (module.params['properties_file'] is not None):
             if ((module.params['properties'] is not None) 
                     or (module.params['api_manager'] is not None) 
-                    or (module.params['visualizer_layer'] is not None) 
+                    or (module.params['visualizer'] is not None) 
                     or (module.params['monitoring_enabled'] is not None)):
                 module.fail_json(msg="you can't use 'properties_file' in conjunction with 'properties', 'api_manager', 'visualizer_layer' or 'monitoring_enabled'")
         if (module.params.get('api_manager') is not None):
