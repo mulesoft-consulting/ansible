@@ -329,6 +329,12 @@ def run_module():
     cmd_base += ' --host="' + module.params['host'] + '"'
     cmd_base += ' --organization="' + module.params['organization'] + '"'
     cmd_base += ' exchange asset'
+
+    # convert empty strings to None if it is necessary
+    if (module.params['main_file'] == ''):
+        module.params['main_file'] = None
+    if (module.params['file_path'] == ''):
+        module.params['file_path'] = None
     # exit if I need to do nothing, so check if environment exists
     context = get_context(module, cmd_base)
     if (context['do_nothing'] is True):
