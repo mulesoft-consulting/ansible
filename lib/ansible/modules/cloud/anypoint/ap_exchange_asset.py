@@ -71,7 +71,7 @@ options:
         description:
             - The asset version
         required: false
-        default: 1.0.0
+        default: 1.0
     main_file:
         description:
             - Main file of the API asset.
@@ -86,6 +86,15 @@ options:
     tags:
         description:
             - A list of tags for the asset
+        required: false
+    description:
+        description:
+            - A description for the asset
+        required: false
+    icon:
+        description:
+            - Path to the asset icon file.
+        type: path
         required: false
 
 author:
@@ -165,9 +174,12 @@ def execute_anypoint_cli(module, cmd):
     return result[1]
 
 
-def get_exchange_url(module):
+def get_exchange_url(module, need_version):
     url = 'https://' + module.params['host'] + '/exchange/api/v2/assets/'
-    url += get_asset_identifier(module.params['group_id'], module.params['asset_id'], module.params['asset_version'])
+    if (need_version is True):
+        url += get_asset_identifier(module.params['group_id'], module.params['asset_id'], module.params['asset_version'])
+    else:
+        url += module.params['group_id'] + '/' + module.params['asset_id']
     return url
 
 
@@ -191,7 +203,7 @@ def analyze_asset(module):
         must_update=False,
         deprecated=False
     )
-    my_url = get_exchange_url(module)
+    my_url = get_exchange_url(module, True)
     headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
 
     output = execute_http_call(module, my_url, 'GET', headers, None)
@@ -200,8 +212,9 @@ def analyze_asset(module):
     if (resp_json['status'] == 'deprecated'):
         return_value['deprecated'] = True
 
-    # for now, only the tag list can change
-    if (module.params['tags'] != resp_json['labels']):
+    # for now, only the tag list and the description can change
+    if ((module.params['tags'] != resp_json['labels'])
+            or (module.params['description'] != resp_json['description'])):
         return_value['must_update'] = True
 
     return return_value
@@ -262,11 +275,69 @@ def get_context(module, cmd_base):
     return return_value
 
 
+def set_asset_tags(module):
+    my_url = 'https://anypoint.mulesoft.com/exchange/api/v1/organizations/' + module.params['organization_id'] + '/assets/'
+    my_url += get_asset_identifier(module.params['group_id'], module.params['asset_id'], module.params['asset_version'])
+    my_url += '/tags'
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + module.params['bearer']
+    }
+    payload = module.params['tags']
+    json_payload = []
+    if (payload):
+        json_payload = json.dumps(payload)
+    else:
+        json_payload = json.dumps([])
+
+    output = execute_http_call(module, my_url, 'PUT', headers, json_payload)
+
+    return 'Asset modified'
+
+
+def set_asset_description(module):
+    my_url = get_exchange_url(module, False)
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + module.params['bearer']
+    }
+    tmp_desc = module.params['description']
+    if (tmp_desc is None):
+        tmp_desc = ''
+    payload = {
+        'description': tmp_desc
+    }
+
+    output = json.load(execute_http_call(module, my_url, 'PATCH', headers, json.dumps(payload)))
+
+    return output
+
+
+def set_asset_icon(module):
+    my_url = get_exchange_url(module, False) + '/icon'
+    headers = {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer ' + module.params['bearer']
+    }
+    if (module.params['icon'] is None):
+        # delete the icon
+        output = json.load(execute_http_call(module, my_url, 'DELETE', headers, None))
+    else:
+        headers.update({'Content-Type': 'image/png'})
+        f = open(module.params['icon'], 'rb')
+        payload = f.read()
+        f.close()
+        output = json.load(execute_http_call(module, my_url, 'PUT', headers, payload))
+
+    return output
+
+
 def modify_exchange_asset(module, cmd_base, asset_identifier):
-    modify_cmd = cmd_base
-    modify_cmd += ' modify --tags "' + ','.join(module.params['tags']) + '"'
-    modify_cmd += ' "' + asset_identifier + '"'
-    execute_anypoint_cli(module, modify_cmd)
+    set_asset_tags(module)
+    set_asset_description(module)
+    set_asset_icon(module)
 
     return "Asset modified"
 
@@ -283,8 +354,8 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
     if (module.params['file_path'] is not None):
         upload_cmd += ' "' + module.params['file_path'] + '"'
     execute_anypoint_cli(module, upload_cmd)
-    if (module.params['tags']):
-        modify_exchange_asset(module, cmd_base, asset_identifier)
+    # update other fields
+    modify_exchange_asset(module, cmd_base, asset_identifier)
 
     return return_value
 
@@ -305,7 +376,9 @@ def run_module():
         api_version=dict(type='str', required=False, default="1.0"),
         main_file=dict(type='path', required=False, default=None),
         file_path=dict(type='path', required=False, default=None),
-        tags=dict(type='list', required=False, default=[])
+        tags=dict(type='list', required=False, default=[]),
+        description=dict(type='str', required=False),
+        icon=dict(type='path', required=False, default=None)
     )
     result = dict(
         changed=False,
@@ -335,6 +408,10 @@ def run_module():
         module.params['main_file'] = None
     if (module.params['file_path'] == ''):
         module.params['file_path'] = None
+    if (module.params['icon'] == ''):
+        module.params['icon'] = None
+    if (module.params['description'] == ''):
+        module.params['description'] = None
     # exit if I need to do nothing, so check if environment exists
     context = get_context(module, cmd_base)
     if (context['do_nothing'] is True):
@@ -357,6 +434,10 @@ def run_module():
     elif (module.params['state'] == 'deprecated'):
         if (context['exists'] is False):
             output = upload_exchange_asset(module, cmd_base, asset_identifier)
+        # if it exists and must change then modify
+        if (context['must_update'] is True):
+            output = modify_exchange_asset(module, cmd_base, asset_identifier)
+        # finally just deprecate the asset
         deprecate_cmd = cmd_base
         deprecate_cmd += ' deprecate "' + asset_identifier + '"'
         output = execute_anypoint_cli(module, deprecate_cmd)
