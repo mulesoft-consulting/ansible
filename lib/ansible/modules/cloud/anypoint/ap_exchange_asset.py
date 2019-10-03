@@ -130,7 +130,7 @@ options:
                 description:
                     - Comma separated list of arguments to pass to maven
                     - Each element should be specified as "key=value"
-                    - Used as: "mvn ... -Dkey1=value1 -Dkey2=value2... "
+                    - Used as "mvn ... -Dkey1=value1 -Dkey2=value2... "
                 type: list
                 required: false
 
@@ -225,6 +225,7 @@ def execute_maven(module, cmd):
         module.fail_json(msg='[execute_maven]' + result[1])
 
     return result[1]
+
 
 def get_exchange_url(module, need_version):
     url = 'https://' + module.params['host'] + '/exchange/api/v1/assets/'
@@ -434,10 +435,10 @@ def create_settings_xml(module):
 
 
 def get_distribution_repository_url(module):
-    return_value = 'https://maven.' 
-    return_value += module.params['host'] 
-    return_value += '/api/v1/organizations/' 
-    return_value += module.params['group_id'] 
+    return_value = 'https://maven.'
+    return_value += module.params['host']
+    return_value += '/api/v1/organizations/'
+    return_value += module.params['group_id']
     return_value += '/maven'
 
     return return_value
@@ -461,7 +462,6 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
     elif ((module.params['type'] == "example")
             or (module.params['type'] == "template")):
         print('[DEBUG] implementation for example and template type is in beta')
-        #module.fail_json(msg='deploy templates or examples not supported yet')
         deploy_cmd = ''
         deploy_cmd += 'deploy'
 
@@ -476,7 +476,7 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
             deploy_cmd += ' -f "' + module.params['maven'].get('pom') + '"'
         else:
             deploy_cmd += ' -f "' + module.params['maven']['sources'] + '/pom.xml' + '"'
-        
+
         deploy_cmd += ' -Dbg_id=' + module.params['organization_id']
         deploy_cmd += ' -DgroupId=' + module.params['group_id']
         deploy_cmd += ' -DartifactId=' + module.params['asset_id']
@@ -484,7 +484,7 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
         if (module.params['maven'] is not None and module.params['maven'].get('arguments')):
             user_args = ''
             user_args += ' -D'
-            user_args +=  " -D".join(module.params['maven'].get('arguments'))
+            user_args += " -D".join(module.params['maven'].get('arguments'))
             deploy_cmd += user_args
         # set alternative deployment repository
         deployment_repository = get_distribution_repository_url(module)
@@ -564,7 +564,7 @@ def run_module():
         module.params['description'] = None
     if (module.params['maven'] is not None) and (module.params['maven'].get('sources') == ''):
         module.params['maven']['sources'] = None
-    
+
     # validate required parameters
     if ((module.params['state'] == 'present')
             and ((module.params['type'] == 'example') or (module.params['type'] == 'template'))):
