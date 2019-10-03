@@ -125,7 +125,7 @@ def get_asset_identifier(group_id, asset_id, asset_version):
 
 
 def get_exchange_url(module):
-    url = 'https://' + module.params['host'] + '/exchange/api/v2/assets/'
+    url = 'https://' + module.params['host'] + '/exchange/api/v1/assets/'
     url += get_asset_identifier(module.params['group_id'], module.params['asset_id'], module.params['asset_version']) + '/portal/draft'
     return url
 
