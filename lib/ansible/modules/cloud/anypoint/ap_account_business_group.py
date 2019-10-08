@@ -255,7 +255,6 @@ def get_context(module):
     result = execute_anypoint_cli(module, cmd)
 
     resp_json = json.loads(result)
-
     for item in resp_json:
         if (module.params['parent_id'] is None or module.params['parent_id'] == ''):
             if (item['Type'] == 'Master'):
