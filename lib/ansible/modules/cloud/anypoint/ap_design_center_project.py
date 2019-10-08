@@ -32,7 +32,7 @@ options:
         description:
             - Assert the state of the environment. Use C(present) to create a project, C(published) to publish it to Exchange and C(absent) to delete it.
         required: true
-        choices: [ "present", "published", "absent" ]
+        choices: [ "present", "published", "unpublished", "absent" ]
     bearer:
         description:
             - Anypoint Platform access token for an active session
@@ -199,10 +199,9 @@ def do_no_action_design_center(module, cmd_base):
 
 def do_no_action_exchange(module):
     return_value = None
+    asset_type = module.params['type']
     if (module.params['type'] == 'raml'):
         asset_type = 'rest-api'
-    elif (module.params['type'] == 'raml-fragment'):
-        asset_type = 'raml-fragment'
     # Query exchange using the Graph API
     my_url = 'https://' + module.params['host'] + '/graph/api/v1/graphql'
     headers = {
@@ -217,7 +216,6 @@ def do_no_action_exchange(module):
     }
 
     output = json.load(execute_http_call(module, my_url, 'POST', headers, json.dumps(payload)))
-
     # check if the environment exists
     for item in output['data']['assets']:
         if (module.params['exchange_metadata']['asset_id'] == item['assetId']
@@ -235,7 +233,7 @@ def do_no_action(module, cmd_base):
         exchange_id=None
     )
     return_value['design_center_id'] = do_no_action_design_center(module, cmd_base)
-    if (module.params['state'] == 'published'):
+    if (module.params['state'] == 'published' or module.params['state'] == 'unpublished'):
         return_value['exchange_id'] = do_no_action_exchange(module)
 
     return return_value
@@ -332,6 +330,19 @@ def publish_project_to_exchange(module, cmd_base):
     return result
 
 
+def unpublish_project_from_exchange(module):
+    asset_identifier = module.params['exchange_metadata']['group_id'] + "/" 
+    asset_identifier += module.params['exchange_metadata']['asset_id'] + "/"
+    asset_identifier += module.params['exchange_metadata']['asset_version']
+    cmd_final = get_anypointcli_path(module) + " --bearer=\"" + module.params['bearer'] + "\""
+    cmd_final += " --host=\"" + module.params['host'] + "\""
+    cmd_final += " --organization=\"" + module.params['organization'] + "\""
+    cmd_final += " exchange asset delete "
+    cmd_final += ' "' + asset_identifier + '"'
+
+    return module.run_command(cmd_final)
+
+
 def delete_project(module, cmd_base):
     cmd_final = cmd_base + ' delete' ' "' + module.params['name'] + '"'
     result = module.run_command(cmd_final)
@@ -352,7 +363,7 @@ def run_module():
     # define available arguments/parameters a user can pass to the module
     module_args = dict(
         name=dict(type='str', required=True),
-        state=dict(type='str', required=True, choices=["present", "published", "absent"]),
+        state=dict(type='str', required=True, choices=["present", "published", "unpublished", "absent"]),
         bearer=dict(type='str', required=True),
         host=dict(type='str', required=False, default='anypoint.mulesoft.com'),
         organization=dict(type='str', required=True),
@@ -397,15 +408,15 @@ def run_module():
         if (module.params['project_dir'] is not None) and (module.params['organization_id'] is None):
             module.fail_json(msg="present and published states needs 'organization_id' option")
 
-        # this is only required for published state
-        if module.params['state'] == "published":
+        # this is only required for published/unpublished state
+        if (module.params['state'] == "published" or module.params['state'] == "unpublished"):
             # validate exchange required arguments without default value
             if module.params['exchange_metadata']['main'] is None:
-                module.fail_json(msg="published state needs 'exchange_metadata.main' option")
+                module.fail_json(msg="published|unpublished state needs 'exchange_metadata.main' option")
             if module.params['exchange_metadata']['group_id'] is None:
-                module.fail_json(msg="published state needs 'exchange_metadata.group_id' option")
+                module.fail_json(msg="published|unpublished state needs 'exchange_metadata.group_id' option")
             if module.params['exchange_metadata']['asset_id'] is None:
-                module.fail_json(msg="published state needs 'exchange_metadata.asset_id' option")
+                module.fail_json(msg="published|unpublished state needs 'exchange_metadata.asset_id' option")
     # no specific parameters for deletion needs to be checked
 
     # if the user is working with this module in only check mode we do not
@@ -439,12 +450,15 @@ def run_module():
             output = upload_project(module, cmd_base)
             if output[0] != 0:
                 module.fail_json(msg=output[1])
-
         # exchange part
         if (module.params['state'] == "published"):
             if (context['exchange_id'] is None):
                 output = publish_project_to_exchange(module, cmd_base)
-
+    elif (module.params['state'] == "unpublished"):
+        if (context['exchange_id'] is None):
+            module.exit_json(**result)  # do nothing
+        else:
+            output = unpublish_project_from_exchange(module)
     elif (module.params['state'] == "absent"):
         if (context['design_center_id'] is None):
             module.exit_json(**result)  # do nothing
