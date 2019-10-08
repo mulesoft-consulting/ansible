@@ -191,7 +191,7 @@ msg:
     returned: always
 '''
 
-import json
+import json,importlib
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.urls import open_url
 
@@ -219,7 +219,6 @@ def execute_anypoint_cli(module, cmd):
 def execute_maven(module, cmd):
     final_cmd = get_maven_path(module)
     final_cmd += ' ' + cmd
-    print('[DEUG] ' + final_cmd)
     result = module.run_command(final_cmd)
     if result[0] != 0:
         module.fail_json(msg='[execute_maven]' + result[1])
@@ -228,7 +227,7 @@ def execute_maven(module, cmd):
 
 
 def get_exchange_url(module, need_version):
-    url = 'https://' + module.params['host'] + '/exchange/api/v1/assets/'
+    url = 'https://' + module.params['host'] + '/exchange/api/v2/assets/'
     if (need_version is True):
         url += get_asset_identifier(module.params['group_id'], module.params['asset_id'], module.params['asset_version'])
     else:
@@ -237,12 +236,10 @@ def get_exchange_url(module, need_version):
 
 
 def execute_http_call(caller, module, url, method, headers, payload):
-    print('[DEBUG] ' + method + ' to ' + url)
     return_value = None
     try:
         if (headers is not None):
             if (payload is not None):
-                print('[DEBUG] with payload ' + str(payload))
                 return_value = open_url(url, method=method, headers=headers, data=payload)
             else:
                 return_value = open_url(url, method=method, headers=headers)
@@ -263,13 +260,12 @@ def analyze_asset(module):
 
     output = execute_http_call('[analyze_asset]', module, my_url, 'GET', headers, None)
     resp_json = json.loads(output.read())
-
     if (resp_json['status'] == 'deprecated'):
         return_value['deprecated'] = True
 
     # for now, only the tag list and the description can change
     if ((module.params['tags'] != resp_json['labels'])
-            or (module.params['description'] != resp_json['description'])):
+            or ((module.params['description'] is not None) and (module.params['description'] != resp_json['description']))):
         return_value['must_update'] = True
 
     return return_value
@@ -285,17 +281,19 @@ def look_asset_on_exchange(module):
         'Authorization': 'Bearer ' + module.params['bearer']
     }
     payload = {
-        'query': '{assets(query: {organizationIds: ["' + module.params['organization_id'] + '"],'
-                 'searchTerm: "' + module.params['asset_id'] + '"'
-                 ', offset: 0, limit: 100}){assetId groupId version type}}'
+        'query': '{assets(asset: {groupId: "' + module.params['group_id'] + '",'
+                 'assetId: "' + module.params['asset_id'] + '"'
+                 'version: "' + module.params['asset_version'] + '"'
+                 '}){assetId groupId version type name}}'
     }
 
     output = json.load(execute_http_call('[look_asset_on_exchange]', module, my_url, 'POST', headers, json.dumps(payload)))
     if (output.get('errors')):
-        module.fail_json(msg='Error finding asset on exchange: ' + output['errors'][0]['message'])
-    print(output)
-    # check if the environment exists
-    for item in output['data'].get('assets'):
+        if (output['errors'][0].get('status') != 404):
+            module.fail_json(msg='Error finding asset on exchange: ' + output['errors'][0]['message'])
+    else:
+        # check if the asset exists
+        item = output['data']['assets'][0]
         if (module.params['asset_id'] == item['assetId']
                 and module.params['group_id'] == item['groupId']
                 and module.params['asset_version'] == item['version']
@@ -422,7 +420,6 @@ def create_settings_xml(module):
     xml_content += r'        </server>' + '\n'
     xml_content += r'    </servers>' + '\n'
     xml_content += r'</settings>' + '\n'
-    print('[DEBUG] dynamic xml created: ' + xml_content)
     # create the settings file
     try:
         f = open(get_settings_xml_path(module), "w")
@@ -461,9 +458,8 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
         execute_anypoint_cli(module, upload_cmd)
     elif ((module.params['type'] == "example")
             or (module.params['type'] == "template")):
-        print('[DEBUG] implementation for example and template type is in beta')
         deploy_cmd = ''
-        deploy_cmd += 'deploy'
+        deploy_cmd += '-U -B clean deploy -DskipTests -DattachMuleSources=true'
 
         # process global settings file
         if (module.params['maven'] is not None) and (module.params['maven'].get('settings') is not None):
@@ -477,10 +473,10 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
         else:
             deploy_cmd += ' -f "' + module.params['maven']['sources'] + '/pom.xml' + '"'
 
-        deploy_cmd += ' -Dbg_id=' + module.params['organization_id']
-        deploy_cmd += ' -DgroupId=' + module.params['group_id']
-        deploy_cmd += ' -DartifactId=' + module.params['asset_id']
-        deploy_cmd += ' -Dversion=' + module.params['asset_version']
+        deploy_cmd += ' -Denv.bgId=' + module.params['organization_id']
+        #deploy_cmd += ' -Denv.groupId=' + module.params['group_id']
+        #deploy_cmd += ' -DartifactId=' + module.params['asset_id']
+        deploy_cmd += ' -Denv.version=' + module.params['asset_version']
         if (module.params['maven'] is not None and module.params['maven'].get('arguments')):
             user_args = ''
             user_args += ' -D'

@@ -199,7 +199,7 @@ def create_image_resource(module, portal_resources_url, file_name):
 
 
 def get_exchange_portal_resources_url(module):
-    return get_anypoint_base_url(module) + '/exchange/api/v1/portals/' + get_domain(module) + '/draft/resources'
+    return get_anypoint_base_url(module) + '/exchange/api/v2/portals/' + get_domain(module) + '/draft/resources'
 
 
 def publish_portal(module, portal_url, set_default_content):

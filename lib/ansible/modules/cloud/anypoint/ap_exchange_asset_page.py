@@ -119,7 +119,7 @@ def get_asset_identifier(group_id, asset_id, asset_version):
 
 
 def get_exchange_url(module):
-    url = 'https://' + module.params['host'] + '/exchange/api/v1/assets/'
+    url = 'https://' + module.params['host'] + '/exchange/api/v2/assets/'
     url += get_asset_identifier(module.params['group_id'], module.params['asset_id'], module.params['asset_version']) + '/portal/draft'
     return url
 
@@ -191,13 +191,18 @@ def replace_resource_names(module, filedata):
 
 def page_content_must_change(module):
     # read data from existing object
-    tmp_dir = '/tmp/' + module.md5(module.params['md_path'])
     try:
+        tmp_dir = '/tmp/' + module.md5(module.params['md_path'])
+    except Exception as e:
+        module.fail_json(msg="[page_content_must_change] Error reading file %s" % module.params['md_path'])
+
+    try:
+    
         os.mkdir(tmp_dir)
     except Exception as e:
         module.fail_json(msg="[page_content_must_change] Creation of the directory %s failed" % tmp_dir)
 
-    output = execute_anypoint_command(module, 'download', ' "' + tmp_dir + '" "' + module.params['name'] + '"')
+    execute_anypoint_command(module, 'download', ' "' + tmp_dir + '" "' + module.params['name'] + '"')
 
     downloaded_file = tmp_dir + '/' + module.params['name'] + '.md'
     f = open(downloaded_file, 'r')
