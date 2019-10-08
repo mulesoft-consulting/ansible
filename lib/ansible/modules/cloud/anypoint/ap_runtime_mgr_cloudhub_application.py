@@ -379,7 +379,7 @@ def create_or_update_cloudhub_application(module, cmd_base, context):
     return_value = dict(
         app_url=None,
         app_status=None,
-        msg='[create_or_update_cloudhub_application] NOT_IMPLEMENTED'
+        msg=None
     )
 
     cmd_final = cmd_base
@@ -438,8 +438,8 @@ def create_or_update_cloudhub_application(module, cmd_base, context):
             cmd_final += ' --property "' + api['id'] + r'.basePath\=' + api['base_path'] + '"'
 
     # add application name and file path
-    cmd_final += ' ' + module.params['name']
-    cmd_final += ' ' + module.params['file']
+    cmd_final += ' "' + module.params['name'] + '"'
+    cmd_final += ' "' + module.params['file'] + '"'
 
     # execute anypoint-cli command and save the output
     output = execute_anypoint_cli(module, cmd_final)
