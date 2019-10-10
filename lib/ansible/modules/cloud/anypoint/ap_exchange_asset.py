@@ -473,10 +473,9 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
         else:
             deploy_cmd += ' -f "' + module.params['maven']['sources'] + '/pom.xml' + '"'
 
-        deploy_cmd += ' -Denv.bgId=' + module.params['organization_id']
-        #deploy_cmd += ' -Denv.groupId=' + module.params['group_id']
-        #deploy_cmd += ' -DartifactId=' + module.params['asset_id']
-        deploy_cmd += ' -Denv.version=' + module.params['asset_version']
+        deploy_cmd += ' -DgroupId=' + module.params['group_id']
+        deploy_cmd += ' -DartifactId=' + module.params['asset_id']
+        deploy_cmd += ' -Dversion=' + module.params['asset_version']
         if (module.params['maven'] is not None and module.params['maven'].get('arguments')):
             user_args = ''
             user_args += ' -D'
