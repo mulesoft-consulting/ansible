@@ -108,9 +108,6 @@ options:
 
 author:
     - Gonzalo Camino (@gonzalo-camino)
-
-requirements:
-    - anypoint-cli
 '''
 
 EXAMPLES = '''
