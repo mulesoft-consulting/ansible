@@ -26,10 +26,10 @@ description:
 options:
     name:
         description:
-            - Asset page name. Naming the page [home] makes the uploaded page the main description page for the Exchange asset
+            - Exchange asset name.
     state:
         description:
-            - Assert the state of the page. Use C(present) to create an asset undeprecated, C(deprecated) toi deprecate it and C(absent) to delete it.
+            - Assert the state of the asset. Use C(present) to create an asset undeprecated, C(deprecated) toi deprecate it and C(absent) to delete it.
         required: true
         choices: [ "present", "deprecated", "absent" ]
     bearer:
@@ -191,7 +191,10 @@ msg:
     returned: always
 '''
 
-import json,importlib
+import json
+import importlib
+import os
+import xml.etree.ElementTree as ET
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.urls import open_url
 
@@ -248,6 +251,10 @@ def execute_http_call(caller, module, url, method, headers, payload):
         module.fail_json(msg=caller + ' ' + str(e))
 
     return return_value
+
+
+def get_tmp_dir():
+    return '/tmp'
 
 
 def analyze_asset(module):
@@ -403,7 +410,7 @@ def modify_exchange_asset(module, cmd_base, asset_identifier):
 
 
 def get_settings_xml_path(module):
-    return '/tmp/' + module.params['organization_id'] + '_settings.xml'
+    return get_tmp_dir() + '/' + module.params['group_id'] + '_' + module.params['asset_id'] + '_settings.xml'
 
 
 def create_settings_xml(module):
@@ -441,6 +448,23 @@ def get_distribution_repository_url(module):
     return return_value
 
 
+def modify_pom_file(module, source_pom):
+    ET.register_namespace('', 'http://maven.apache.org/POM/4.0.0')
+    tree = ET.parse(source_pom)
+    root = tree.getroot()
+    version_elem = root.find('{http://maven.apache.org/POM/4.0.0}version')
+    actifact_id_elem = root.find('{http://maven.apache.org/POM/4.0.0}artifactId')
+    group_id_elem = root.find('{http://maven.apache.org/POM/4.0.0}groupId')
+    name_elem = root.find('{http://maven.apache.org/POM/4.0.0}name')
+    # modify with supplied values
+    version_elem.text = module.params['asset_version']
+    actifact_id_elem.text = module.params['asset_id']
+    group_id_elem.text = module.params['group_id']
+    name_elem.text = module.params['name']
+    # finally write out content to the pom.xml file
+    tree.write(source_pom)
+
+
 def upload_exchange_asset(module, cmd_base, asset_identifier):
     return_value = 'Asset uploaded'
     if ((module.params['type'] == "custom")
@@ -458,6 +482,7 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
         execute_anypoint_cli(module, upload_cmd)
     elif ((module.params['type'] == "example")
             or (module.params['type'] == "template")):
+
         deploy_cmd = ''
         deploy_cmd += '-U -B clean deploy -DskipTests -DattachMuleSources=true'
 
@@ -468,14 +493,15 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
             create_settings_xml(module)
             deploy_cmd += ' -s "' + get_settings_xml_path(module) + '"'
         # process alternate pom file
+        source_pom = ''
         if (module.params['maven'] is not None) and (module.params['maven'].get('pom')):
-            deploy_cmd += ' -f "' + module.params['maven'].get('pom') + '"'
+            source_pom = module.params['maven'].get('pom')
         else:
-            deploy_cmd += ' -f "' + module.params['maven']['sources'] + '/pom.xml' + '"'
-
-        deploy_cmd += ' -DgroupId=' + module.params['group_id']
-        deploy_cmd += ' -DartifactId=' + module.params['asset_id']
-        deploy_cmd += ' -Dversion=' + module.params['asset_version']
+            source_pom = module.params['maven']['sources'] + '/pom.xml'
+        # update group id, artifact id and version on the selected pom.xml
+        modify_pom_file(module, source_pom)
+        deploy_cmd += ' -f "' + source_pom + '"'
+        # add specific variables
         if (module.params['maven'] is not None and module.params['maven'].get('arguments')):
             user_args = ''
             user_args += ' -D'
