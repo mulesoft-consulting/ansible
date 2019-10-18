@@ -277,6 +277,10 @@ url:
     description: application url
     type: str
     returned: always
+status:
+    description: application status
+    type: str
+    returned: always
 msg:
     description: Anypoint CLI command output
     type: str
@@ -549,8 +553,8 @@ def run_module():
 
     result = dict(
         changed=False,
-        app_url=None,
-        app_status=None,
+        url=None,
+        status=None,
         msg='No action taken'
     )
 
@@ -599,8 +603,8 @@ def run_module():
 
     # exit if I need to do nothing, so check if asset exists in exchange
     context = get_context(module, cmd_base)
-    result['app_url'] = context['app_url']
-    result['app_status'] = context['app_status']
+    result['url'] = context['app_url']
+    result['status'] = context['app_status']
 
     if (context['do_nothing'] is True):
         module.exit_json(**result)
@@ -616,8 +620,8 @@ def run_module():
     elif (module.params['state'] == "absent"):
         output = delete_cloudhub_application(module, cmd_base, context)
 
-    result['app_url'] = output['app_url']
-    result['app_status'] = output['app_status']
+    result['url'] = output['app_url']
+    result['status'] = output['app_status']
     result['msg'] = output['msg']
     result['changed'] = True
 
