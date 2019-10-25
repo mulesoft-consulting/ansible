@@ -52,8 +52,10 @@ options:
     type:
         description:
             - The asset type
+            - Mule 3 connectors supported (type "connector")
+            - Mule 4 connectors supported (type "extension")
         required: true
-        choices: [ "custom", "oas", "wsdl", "example", "template" ]
+        choices: [ "custom", "oas", "wsdl", "example", "template", "extension", "connector" ]
     group_id:
         description:
             - The asset groupId
@@ -82,7 +84,7 @@ options:
         description:
             - Path to the asset file. Required for C(present)
             - If points to a ZIP archive file, that archive must include an C(exchange.json) file describing the asset
-            - Use it only for asset types "custom", "oas" and "wsdl"
+            - Use it only for asset types "custom", "oas", "wsdl" and "extension"
         type: path
         required: false
     tags:
@@ -222,6 +224,7 @@ def execute_anypoint_cli(module, cmd):
 def execute_maven(module, cmd):
     final_cmd = get_maven_path(module)
     final_cmd += ' ' + cmd
+    print('[DEBUG] ' + final_cmd)
     result = module.run_command(final_cmd)
     if result[0] != 0:
         module.fail_json(msg='[execute_maven]' + result[1])
@@ -361,6 +364,22 @@ def set_asset_tags(module):
     return 'Asset modified'
 
 
+def set_asset_name(module):
+    my_url = get_exchange_url(module, False)
+    headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + module.params['bearer']
+    }
+    payload = {
+        'name': module.params['name']
+    }
+
+    output = json.load(execute_http_call('[set_asset_name]', module, my_url, 'PATCH', headers, json.dumps(payload)))
+
+    return output
+
+
 def set_asset_description(module):
     my_url = get_exchange_url(module, False)
     headers = {
@@ -388,14 +407,14 @@ def set_asset_icon(module):
     }
     if (module.params['icon'] is None):
         # delete the icon
-        execute_http_call('[set_asset_tags]', module, my_url, 'DELETE', headers, None)
+        execute_http_call('[set_asset_icon]', module, my_url, 'DELETE', headers, None)
         output = 'Asset icon deleted (if any)'
     else:
         headers.update({'Content-Type': 'image/png'})
         f = open(module.params['icon'], 'rb')
         payload = f.read()
         f.close()
-        output = json.load(execute_http_call('[set_asset_tags]', module, my_url, 'PUT', headers, payload))
+        output = json.load(execute_http_call('[set_asset_icon]', module, my_url, 'PUT', headers, payload))
         output = 'Asset icon updated'
 
     return output
@@ -481,37 +500,62 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
             upload_cmd += ' "' + module.params['file_path'] + '"'
         execute_anypoint_cli(module, upload_cmd)
     elif ((module.params['type'] == "example")
-            or (module.params['type'] == "template")):
-
+            or (module.params['type'] == "template")
+            or (module.params['type'] == "connector")
+            or (module.params['type'] == "extension")):
         deploy_cmd = ''
-        deploy_cmd += '-U -B clean deploy -DskipTests -DattachMuleSources=true'
+        if ((module.params['type'] == "example") or (module.params['type'] == "template")):
+            deploy_cmd += '-U -B clean deploy -DskipTests -DattachMuleSources=true'
 
-        # process global settings file
-        if (module.params['maven'] is not None) and (module.params['maven'].get('settings') is not None):
-            deploy_cmd += ' -gs "' + module.params['maven'].get('settings') + '"'
-        # process user settings file
+            # process global settings file
+            if (module.params['maven'] is not None) and (module.params['maven'].get('settings') is not None):
+                deploy_cmd += ' -gs "' + module.params['maven'].get('settings') + '"'
+            # process user settings file
             create_settings_xml(module)
             deploy_cmd += ' -s "' + get_settings_xml_path(module) + '"'
-        # process alternate pom file
-        source_pom = ''
-        if (module.params['maven'] is not None) and (module.params['maven'].get('pom')):
-            source_pom = module.params['maven'].get('pom')
-        else:
-            source_pom = module.params['maven']['sources'] + '/pom.xml'
-        # update group id, artifact id and version on the selected pom.xml
-        modify_pom_file(module, source_pom)
-        deploy_cmd += ' -f "' + source_pom + '"'
-        # add specific variables
-        if (module.params['maven'] is not None and module.params['maven'].get('arguments')):
-            user_args = ''
-            user_args += ' -D'
-            user_args += " -D".join(module.params['maven'].get('arguments'))
-            deploy_cmd += user_args
-        # set alternative deployment repository
-        deployment_repository = get_distribution_repository_url(module)
-        deploy_cmd += ' -DaltDeploymentRepository="' + 'Repository::default::' + deployment_repository + '"'
-        # finally execute the maven command
-        execute_maven(module, deploy_cmd)
+            # process alternate pom file
+            source_pom = ''
+            if (module.params['maven'] is not None) and (module.params['maven'].get('pom')):
+                source_pom = module.params['maven'].get('pom')
+            else:
+                source_pom = module.params['maven']['sources'] + '/pom.xml'
+            # update group id, artifact id and version on the selected pom.xml
+            modify_pom_file(module, source_pom)
+            deploy_cmd += ' -f "' + source_pom + '"'
+            # add specific variables
+            if (module.params['maven'] is not None and module.params['maven'].get('arguments')):
+                user_args = ''
+                user_args += " -D".join(module.params['maven'].get('arguments'))
+                deploy_cmd += user_args
+            # set alternative deployment repository
+            deployment_repository = get_distribution_repository_url(module)
+            deploy_cmd += ' -DaltDeploymentRepository="' + 'Repository::default::' + deployment_repository + '"'
+            # finally execute the maven command
+            execute_maven(module, deploy_cmd)
+        elif ((module.params['type'] == "extension") or (module.params['type'] == "connector")):
+            deploy_cmd += 'deploy:deploy-file'
+            # process user settings file
+            create_settings_xml(module)
+            deploy_cmd += ' -s "' + get_settings_xml_path(module) + '"'
+            # set the required pom attributes
+            deploy_cmd += ' -Dfile=' + module.params['file_path']
+            deploy_cmd += ' -DrepositoryId=Repository'
+            deploy_cmd += ' -DartifactId=' + module.params['asset_id']
+            deploy_cmd += ' -DgroupId=' + module.params['group_id']
+            deploy_cmd += ' -Dversion=' + module.params['asset_version']
+            # set classifier: studio-plugin for Mule 3 connectors or mule-plugin for Mule 4 connectors
+            file_extension = os.path.splitext(module.params['file_path'])[1]
+            if ((module.params['type'] == 'connector') and (file_extension == '.zip')):
+                deploy_cmd += ' -Dclassifier=studio-plugin'
+            elif ((module.params['type'] == 'extension') and (file_extension == '.jar')):
+                deploy_cmd += ' -Dclassifier=mule-plugin'
+            else:
+                module.fail_json(msg='invalid file extension for ' + module.params['type'] + ' asset type (only supported .zip for mule 3 and .jar for mule 4)')
+            deploy_cmd += ' -Durl=' + get_distribution_repository_url(module)
+            # finally execute the maven command
+            execute_maven(module, deploy_cmd)
+            # set the asset name: this is required just for extension asset type
+            set_asset_name(module)
 
     # update other fields if it is necessary
     modify_exchange_asset(module, cmd_base, asset_identifier)
@@ -535,7 +579,7 @@ def run_module():
         host=dict(type='str', required=False, default='anypoint.mulesoft.com'),
         organization=dict(type='str', required=True),
         organization_id=dict(type='str', required=True),
-        type=dict(type='str', required=True, choices=['custom', 'oas', 'wsdl', 'example', 'template']),
+        type=dict(type='str', required=True, choices=['custom', 'oas', 'wsdl', 'example', 'template', 'extension', 'connector']),
         group_id=dict(type='str', required=True),
         asset_id=dict(type='str', required=True),
         asset_version=dict(type='str', required=False, default="1.0.0"),
@@ -591,6 +635,14 @@ def run_module():
             and ((module.params['type'] == 'example') or (module.params['type'] == 'template'))):
         if ((module.params['maven'] is None) or (module.params['maven'].get('project_dir') is not None)):
             module.fail_json(msg='asset type template or example requires a project directory to build it')
+
+    if (module.params['state'] == 'present'):
+        if ((module.params['type'] == 'oas')
+                or (module.params['type'] == 'wsdl')
+                or (module.params['type'] == 'connector')
+                or (module.params['type'] == 'extension')):
+            if (module.params['file_path'] is None):
+                module.fail_json(msg='asset type oas, wsdl, connector or extension requires a file path to upload it')
 
     # exit if I need to do nothing, so check if environment exists
     context = get_context(module, cmd_base)
