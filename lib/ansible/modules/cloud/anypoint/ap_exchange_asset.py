@@ -54,8 +54,9 @@ options:
             - The asset type
             - Mule 3 connectors supported (type "connector")
             - Mule 4 connectors supported (type "extension")
+            - Mule 4 policies supported (type "policy")
         required: true
-        choices: [ "custom", "oas", "wsdl", "example", "template", "extension", "connector" ]
+        choices: [ "custom", "oas", "wsdl", "example", "template", "extension", "connector", "policy" ]
     group_id:
         description:
             - The asset groupId
@@ -224,7 +225,6 @@ def execute_anypoint_cli(module, cmd):
 def execute_maven(module, cmd):
     final_cmd = get_maven_path(module)
     final_cmd += ' ' + cmd
-    print('[DEBUG] ' + final_cmd)
     result = module.run_command(final_cmd)
     if result[0] != 0:
         module.fail_json(msg='[execute_maven]' + result[1])
@@ -502,7 +502,8 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
     elif ((module.params['type'] == "example")
             or (module.params['type'] == "template")
             or (module.params['type'] == "connector")
-            or (module.params['type'] == "extension")):
+            or (module.params['type'] == "extension")
+            or (module.params['type'] == "policy")):
         deploy_cmd = ''
         if ((module.params['type'] == "example") or (module.params['type'] == "template")):
             deploy_cmd += '-U -B clean deploy -DskipTests -DattachMuleSources=true'
@@ -532,7 +533,7 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
             deploy_cmd += ' -DaltDeploymentRepository="' + 'Repository::default::' + deployment_repository + '"'
             # finally execute the maven command
             execute_maven(module, deploy_cmd)
-        elif ((module.params['type'] == "extension") or (module.params['type'] == "connector")):
+        elif ((module.params['type'] == "extension") or (module.params['type'] == "connector") or (module.params['type'] == "policy")):
             deploy_cmd += 'deploy:deploy-file'
             # process user settings file
             create_settings_xml(module)
@@ -543,12 +544,14 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
             deploy_cmd += ' -DartifactId=' + module.params['asset_id']
             deploy_cmd += ' -DgroupId=' + module.params['group_id']
             deploy_cmd += ' -Dversion=' + module.params['asset_version']
-            # set classifier: studio-plugin for Mule 3 connectors or mule-plugin for Mule 4 connectors
+            # set classifier: studio-plugin for Mule 3 connectors or mule-plugin for Mule 4 connectors or mule-policy for mule 4 policies
             file_extension = os.path.splitext(module.params['file_path'])[1]
             if ((module.params['type'] == 'connector') and (file_extension == '.zip')):
                 deploy_cmd += ' -Dclassifier=studio-plugin'
             elif ((module.params['type'] == 'extension') and (file_extension == '.jar')):
                 deploy_cmd += ' -Dclassifier=mule-plugin'
+            elif ((module.params['type'] == 'policy') and (file_extension == '.jar')):
+                deploy_cmd += ' -Dclassifier=mule-policy'
             else:
                 module.fail_json(msg='invalid file extension for ' + module.params['type'] + ' asset type (only supported .zip for mule 3 and .jar for mule 4)')
             deploy_cmd += ' -Durl=' + get_distribution_repository_url(module)
@@ -579,7 +582,7 @@ def run_module():
         host=dict(type='str', required=False, default='anypoint.mulesoft.com'),
         organization=dict(type='str', required=True),
         organization_id=dict(type='str', required=True),
-        type=dict(type='str', required=True, choices=['custom', 'oas', 'wsdl', 'example', 'template', 'extension', 'connector']),
+        type=dict(type='str', required=True, choices=['custom', 'oas', 'wsdl', 'example', 'template', 'extension', 'connector', 'policy']),
         group_id=dict(type='str', required=True),
         asset_id=dict(type='str', required=True),
         asset_version=dict(type='str', required=False, default="1.0.0"),
@@ -640,9 +643,10 @@ def run_module():
         if ((module.params['type'] == 'oas')
                 or (module.params['type'] == 'wsdl')
                 or (module.params['type'] == 'connector')
-                or (module.params['type'] == 'extension')):
+                or (module.params['type'] == 'extension')
+                or (module.params['type'] == 'policy')):
             if (module.params['file_path'] is None):
-                module.fail_json(msg='asset type oas, wsdl, connector or extension requires a file path to upload it')
+                module.fail_json(msg='asset type oas, wsdl, connector, extension or policy requires a file path to upload it')
 
     # exit if I need to do nothing, so check if environment exists
     context = get_context(module, cmd_base)
