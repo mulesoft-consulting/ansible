@@ -273,11 +273,20 @@ def analyze_asset(module):
     if (resp_json['status'] == 'deprecated'):
         return_value['deprecated'] = True
 
-    # for now, only the tag list and the description can change
+    # for now, only the tag list description and icon present/not present can change
     if ((module.params['tags'] != resp_json['labels'])
             or ((module.params['description'] is not None) and (module.params['description'] != resp_json['description']))):
         return_value['must_update'] = True
-
+    else:
+        if (module.params['icon'] is not None):
+            return_value['must_update'] = True
+            for item in resp_json['files']:
+                if (item['classifier'] == 'icon'):
+                    icon_md5 = module.md5(module.params['icon'])
+                    if (icon_md5 == item['md5']):
+                        return_value['must_update'] = False
+                        break
+    
     return return_value
 
 
@@ -410,7 +419,13 @@ def set_asset_icon(module):
         execute_http_call('[set_asset_icon]', module, my_url, 'DELETE', headers, None)
         output = 'Asset icon deleted (if any)'
     else:
-        headers.update({'Content-Type': 'image/png'})
+        icon_extension = os.path.splitext(module.params['icon'])[1]
+        if (icon_extension == '.png'):
+            headers.update({'Content-Type': 'image/png'})
+        elif (icon_extension == '.svg'):
+            headers.update({'Content-Type': 'image/svg+xml'})
+        else:
+            module.fail_json(msg=('Unsupported extension [' + icon_extension + ']. Supported only png and svg'))
         f = open(module.params['icon'], 'rb')
         payload = f.read()
         f.close()
@@ -539,7 +554,7 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
             create_settings_xml(module)
             deploy_cmd += ' -s "' + get_settings_xml_path(module) + '"'
             # set the required pom attributes
-            deploy_cmd += ' -Dfile=' + module.params['file_path']
+            deploy_cmd += ' -Dfile="' + module.params['file_path'] + '"'
             deploy_cmd += ' -DrepositoryId=Repository'
             deploy_cmd += ' -DartifactId=' + module.params['asset_id']
             deploy_cmd += ' -DgroupId=' + module.params['group_id']
