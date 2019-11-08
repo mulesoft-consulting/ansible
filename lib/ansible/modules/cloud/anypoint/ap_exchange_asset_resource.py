@@ -200,12 +200,10 @@ def create_resource(module):
         s = requests.Session()
         resp = s.send(prepared)
         resp_json = json.loads(resp.text)
-        print(resp_json)
         resp_json["path"]
     except Exception as e:
         module.fail_json(msg='[create_resource] ' + str(e) + str(resp_json))
 
-    print('[DEBUG] path: ' + resp_json["path"])
     return_value['resource_url'] = resp_json["path"]
 
     return return_value
