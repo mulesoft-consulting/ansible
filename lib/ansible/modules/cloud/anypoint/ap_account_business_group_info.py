@@ -49,11 +49,18 @@ requirements:
 '''
 
 EXAMPLES = '''
-# Example of creating an empty business group
+# Example of gathering info from a  business group at master level
 - name: get info abount a business group
   ap_account_business_group_info:
     name: 'My Demos'
     bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
+
+# Example of gathering info from a  business group with parent different than master
+- name: get info abount a business group
+  ap_account_business_group_info:
+    name: 'My Demos'
+    bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
+    parent_id: '2fd8fa2f-b980-453e-956a-d93c947e3421'
 '''
 
 RETURN = '''
@@ -93,6 +100,20 @@ created_at:
     description: Business group creation date
     type: str
     returned: success
+parent:
+    description: 
+        - info about parent org
+        - it is empty if business group is the master org
+    type: dict
+    contains:
+        id:
+            description: Parent Org ID
+            type: str
+            returned: success
+        name:
+            description: Parent Org name
+            type: str
+            returned: success
 environments:
     description: List with business group environments
     type: list
@@ -282,7 +303,6 @@ def run_module():
     result = dict(
         id=None,
         name=None,
-        parent_id=None,
         client_id=None,
         client_secret=None,
         is_master=None,
@@ -290,8 +310,14 @@ def run_module():
         idprovider_id=None,
         owner_id=None,
         created_at=None,
+        parent=None,
         environments=None,
         entitlements=None
+    )
+    # parent
+    parent = dict(
+        id=None,
+        name=None
     )
 
     module = AnsibleModule(
@@ -319,17 +345,19 @@ def run_module():
     for org in resp_json:
         if (module.params['parent_id'] is None or module.params['parent_id'] == ''):
             if (org['Type'] == 'Master'):
-                result['parent_id'] = org.get('Id')
+                parent['id'] = org['Id']
+                parent['name'] = org['Name']
                 break
         else:
             if (org['Id'] == module.params['parent_id']):
-                result['parent_id'] = org['Id']
+                parent['id'] = org['Id']
+                parent['name'] = org['Name']
                 break
 
     # check if business group exists within parent subOrgs
-    if (result['parent_id'] is not None):
-        parent = get_organization(module, result['parent_id'])
-        for child_id in parent['subOrganizationIds']:
+    if (parent['id'] is not None):
+        tmp_parent = get_organization(module, parent['id'])
+        for child_id in tmp_parent['subOrganizationIds']:
             child = get_organization(module, child_id)
             if (child['name'] == module.params['name']):
                 result['id'] = child['id']
@@ -349,6 +377,7 @@ def run_module():
     result['idprovider_id'] = child['idprovider_id']
     result['owner_id'] = child['ownerId']
     result['created_at'] = child['createdAt']
+    result['parent'] = parent
     # environments
     env = dict(
         id=None,
