@@ -285,8 +285,8 @@ def prepare_project_to_upload(project_dir, org_id):
     for file in os.listdir(project_dir):
         if file.endswith(".raml"):
             raml_file = os.path.join(project_dir, file)
-            regex = '\/exchange_modules\/' + get_org_id_regex() + '\/'
-            new_string = '/exchange_modules/' + org_id + '/'
+            regex = 'exchange_modules\/' + get_org_id_regex() + '\/'
+            new_string = 'exchange_modules/' + org_id + '/'
             replace_file_str_regex(raml_file, regex, new_string)
 
 
