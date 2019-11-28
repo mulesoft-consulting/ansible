@@ -210,19 +210,20 @@ def do_no_action_exchange(module):
         'Authorization': 'Bearer ' + module.params['bearer']
     }
     payload = {
-        'query': '{assets(query: {organizationIds: ["' + module.params['organization_id'] + '"],'
-                 'searchTerm: "' + module.params['exchange_metadata']['asset_id'] + '"'
-                 ', offset: 0, limit: 100}){assetId groupId version type}}'
+        'query': '{assets(asset:{groupId: "' + module.params['exchange_metadata']['group_id'] + '",'
+                 'assetId: "' + module.params['exchange_metadata']['asset_id'] + '",'
+                 'version: "'+ module.params['exchange_metadata']['asset_version'] +'"}) {assetId groupId version type name}}'
     }
 
     output = json.load(execute_http_call(module, my_url, 'POST', headers, json.dumps(payload)))
     # check if the environment exists
-    for item in output['data']['assets']:
-        if (module.params['exchange_metadata']['asset_id'] == item['assetId']
-                and module.params['exchange_metadata']['group_id'] == item['groupId']
-                and module.params['exchange_metadata']['asset_version'] == item['version']
-                and asset_type == item['type']):
-            return_value = item['assetId']
+    if (output['data'] is not None):
+        for item in output['data']['assets']:
+            if (module.params['exchange_metadata']['asset_id'] == item['assetId']
+                    and module.params['exchange_metadata']['group_id'] == item['groupId']
+                    and module.params['exchange_metadata']['asset_version'] == item['version']
+                    and asset_type == item['type']):
+                return_value = item['assetId']
 
     return return_value
 
