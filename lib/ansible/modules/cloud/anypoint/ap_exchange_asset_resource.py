@@ -151,6 +151,8 @@ def remove_uuid_from_resource_name(name):
     name_extension = os.path.splitext(name)[1]
     final_index = len(name_without_extension) - 37
     original_name = name_without_extension[0:final_index] + name_extension
+    # also replace '%' characters because it causes a different name after the resource upload
+    original_name.replace(r'%','')
 
     return original_name
 
@@ -189,7 +191,7 @@ def create_resource(module):
     portal_resources_url = get_exchange_url(module) + '/resources'
     headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
 
-    image_filename = os.path.basename(module.params['path'])
+    image_filename = os.path.basename(module.params['path']).replace(r'%','')
     data = {
         'data': (image_filename, open(module.params['path'], 'rb'), 'image/png')
     }

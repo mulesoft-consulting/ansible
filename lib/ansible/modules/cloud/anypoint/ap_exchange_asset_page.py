@@ -179,12 +179,13 @@ def replace_resource_names(module, filedata):
     for ocurrence in page_resources_to_replace:
         # here I expect a string like "![resources/chalo-2b5affd5-2584-4ccc-a46a-68aeb77806b5.jpg]""
         resource_name = ocurrence.replace('![', '').replace(']', '')
-        #raw_resource_name = remove_uuid_from_resource_name(resource_name.replace('resources/', ''))
-        raw_resource_name = resource_name.replace('resources/', '')
+        original_resource_name = resource_name
+        # if the resource name contains '%', I just remove it becuase it causes troubles at resoruce upload time
+        raw_resource_name = resource_name.replace('resources/', '').replace(r'%','')
         for uploaded_resource in resources_uploaded:
             tmp = remove_uuid_from_resource_name(uploaded_resource['path'].replace('resources/', ''))
             if (tmp == raw_resource_name):
-                filedata = filedata.replace(resource_name, uploaded_resource['path'])
+                filedata = filedata.replace(original_resource_name, uploaded_resource['path'])
                 break
 
     return filedata
