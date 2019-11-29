@@ -84,8 +84,7 @@ options:
     file_path:
         description:
             - Path to the asset file. Required for C(present)
-            - If points to a ZIP archive file, that archive must include an C(exchange.json) file describing the asset
-            - Use it only for asset types "custom", "oas", "wsdl" and "extension"
+            - If points to a ZIP/JAR archive file, that archive must include an C(exchange.json) file describing the asset
         type: path
         required: false
     tags:
@@ -520,35 +519,40 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
             or (module.params['type'] == "extension")
             or (module.params['type'] == "policy")):
         deploy_cmd = ''
-        if ((module.params['type'] == "example") or (module.params['type'] == "template")):
-            deploy_cmd += '-U -B clean deploy -DskipTests -DattachMuleSources=true'
-
-            # process global settings file
-            if (module.params['maven'] is not None) and (module.params['maven'].get('settings') is not None):
-                deploy_cmd += ' -gs "' + module.params['maven'].get('settings') + '"'
-            # process user settings file
-            create_settings_xml(module)
-            deploy_cmd += ' -s "' + get_settings_xml_path(module) + '"'
-            # process alternate pom file
-            source_pom = ''
-            if (module.params['maven'] is not None) and (module.params['maven'].get('pom')):
-                source_pom = module.params['maven'].get('pom')
+        if ((module.params['type'] == 'example' or module.params['type'] == 'template')
+                and (module.params['file_path'] is None)):
+            if (module.params['maven']['sources'] is not None):
+                # need to build the asset from the sources
+                deploy_cmd += '-U -B clean deploy -DskipTests -DattachMuleSources=true'
+                # process global settings file
+                if (module.params['maven'] is not None) and (module.params['maven'].get('settings') is not None):
+                    deploy_cmd += ' -gs "' + module.params['maven'].get('settings') + '"'
+                # process user settings file
+                create_settings_xml(module)
+                deploy_cmd += ' -s "' + get_settings_xml_path(module) + '"'
+                # process alternate pom file
+                source_pom = ''
+                if (module.params['maven'] is not None) and (module.params['maven'].get('pom')):
+                    source_pom = module.params['maven'].get('pom')
+                else:
+                    source_pom = module.params['maven']['sources'] + '/pom.xml'
+                # update group id, artifact id and version on the selected pom.xml
+                modify_pom_file(module, source_pom)
+                deploy_cmd += ' -f "' + source_pom + '"'
+                # add specific variables
+                if (module.params['maven'] is not None and module.params['maven'].get('arguments')):
+                    user_args = ''
+                    user_args += " -D".join(module.params['maven'].get('arguments'))
+                    deploy_cmd += user_args
+                # set alternative deployment repository
+                deployment_repository = get_distribution_repository_url(module)
+                deploy_cmd += ' -DaltDeploymentRepository="' + 'Repository::default::' + deployment_repository + '"'
+                # finally execute the maven command
+                execute_maven(module, deploy_cmd)
             else:
-                source_pom = module.params['maven']['sources'] + '/pom.xml'
-            # update group id, artifact id and version on the selected pom.xml
-            modify_pom_file(module, source_pom)
-            deploy_cmd += ' -f "' + source_pom + '"'
-            # add specific variables
-            if (module.params['maven'] is not None and module.params['maven'].get('arguments')):
-                user_args = ''
-                user_args += " -D".join(module.params['maven'].get('arguments'))
-                deploy_cmd += user_args
-            # set alternative deployment repository
-            deployment_repository = get_distribution_repository_url(module)
-            deploy_cmd += ' -DaltDeploymentRepository="' + 'Repository::default::' + deployment_repository + '"'
-            # finally execute the maven command
-            execute_maven(module, deploy_cmd)
-        elif ((module.params['type'] == "extension") or (module.params['type'] == "connector") or (module.params['type'] == "policy")):
+                module.fail_json(msg='asset type template or example requires either a project directory to build it or a file to just upload it')
+        else:
+            # just upload provided file
             deploy_cmd += 'deploy:deploy-file'
             # process user settings file
             create_settings_xml(module)
@@ -567,6 +571,10 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
                 deploy_cmd += ' -Dclassifier=mule-plugin'
             elif ((module.params['type'] == 'policy') and (file_extension == '.jar')):
                 deploy_cmd += ' -Dclassifier=mule-policy'
+            elif ((module.params['type'] == 'example') and (file_extension == '.jar')):
+                deploy_cmd += ' -Dclassigier=mule-application-example'
+            elif ((module.params['type'] == 'template') and (file_extension == '.jar')):
+                deploy_cmd += ' -Dclassigier=mule-application-template'
             else:
                 module.fail_json(msg='invalid file extension for ' + module.params['type'] + ' asset type (only supported .zip for mule 3 and .jar for mule 4)')
             deploy_cmd += ' -Durl=' + get_distribution_repository_url(module)
