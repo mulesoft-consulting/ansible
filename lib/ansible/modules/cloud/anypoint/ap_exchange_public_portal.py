@@ -194,6 +194,9 @@ def create_image_resource(module, portal_resources_url, file_name):
         resp_json = json.loads(resp.text)
     except Exception as e:
         module.fail_json(msg='[create_image_resource] ' + str(e))
+    if (resp_json.get("path") is None):
+        error_msg = resp_json["message"] + ' (status: ' + str(resp_json["status"]) + ')'
+        module.fail_json(msg='[create_image_resource] ' + error_msg)
 
     return resp_json["path"]
 
