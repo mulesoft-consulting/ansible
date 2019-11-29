@@ -313,13 +313,11 @@ def get_application(module, cmd_base):
 
     cmd_final = cmd_base + ' describe-json '
     cmd_final += ' "' + module.params['name'] + '"'
-
     result = module.run_command(cmd_final)
-
     if (result[0] == 255 and result[1] == error_msg):
         return_value = {}
     elif (result[0] != 0):
-        module.fail_json(msg='Unkown Error getting description for application [' + module.params['name'] + ']')
+        module.fail_json(msg=result[1])
     else:
         return_value = json.loads(result[1])
 
