@@ -101,7 +101,7 @@ created_at:
     type: str
     returned: success
 parent:
-    description: 
+    description:
         - info about parent org
         - it is empty if business group is the master org
     type: dict
@@ -160,8 +160,8 @@ entitlements:
                 assigned:
                     description: Assigned vcores for production environment
                     type: float
-                reassigned:
-                    description: Free vcores for production environment
+                used:
+                    description: Used vcores for production environment
                     type: float
         vcores_sandbox:
             description: available and allocated vcores for sandbox environment
@@ -170,8 +170,8 @@ entitlements:
                 assigned:
                     description: Assigned vcores for sandbox environment
                     type: float
-                reassigned:
-                    description: Free vcores for sandbox environment
+                used:
+                    description: Used vcores for sandbox environment
                     type: float
         vcores_design:
             description: available and allocated vcores for design environment
@@ -180,8 +180,8 @@ entitlements:
                 assigned:
                     description: Assigned vcores for design environment
                     type: float
-                reassigned:
-                    description: Free vcores for design environment
+                used:
+                    description: Used vcores for design environment
                     type: float
         load_balancer:
             description: available and allocated load balancers
@@ -190,8 +190,8 @@ entitlements:
                 assigned:
                     description: Assigned load balancers
                     type: float
-                reassigned:
-                    description: Free load balancers
+                used:
+                    description: Used load balancers
                     type: float
         vpns:
             description: available and allocated vpns
@@ -200,8 +200,8 @@ entitlements:
                 assigned:
                     description: Assigned vpns
                     type: float
-                reassigned:
-                    description: Free vpns
+                used:
+                    description: USed vpns
                     type: float
 
 '''
@@ -252,6 +252,33 @@ def get_business_group_client_secret(module, bg_id, bg_client_id):
 
     resp_json = json.load(execute_http_call(module, my_url, 'GET', headers, None))
     return_value = resp_json['client_secret']
+
+    return return_value
+
+
+def get_business_group_usage(module, bg_id):
+    return_value = dict(
+        production=None,
+        sandbox=None,
+        design=None,
+        load_balancers=None,
+        vpns=None
+    )
+    server_name = 'https://' + module.params['host']
+    api_endpoint = '/accounts/api/cs/organizations/' + bg_id + '/usage'
+    my_url = server_name + api_endpoint
+
+    headers = {
+        'Accept': 'application/json',
+        'Authorization': 'bearer ' + module.params['bearer']
+    }
+
+    resp_json = json.load(execute_http_call(module, my_url, 'GET', headers, None))
+    return_value['production'] = resp_json['productionVCoresConsumed']
+    return_value['sandbox'] = resp_json['sandboxVCoresConsumed']
+    return_value['design'] = resp_json['designVCoresConsumed']
+    return_value['load_balancers'] = resp_json['loadBalancersConsumed']
+    return_value['vpns'] = resp_json['vpnsConsumed']
 
     return return_value
 
@@ -379,15 +406,15 @@ def run_module():
     result['created_at'] = child['createdAt']
     result['parent'] = parent
     # environments
-    env = dict(
-        id=None,
-        name=None,
-        is_production=None,
-        client_id=None,
-        type=None
-    )
     result['environments'] = []
     for environment in child['environments']:
+        env = dict(
+            id=None,
+            name=None,
+            is_production=None,
+            client_id=None,
+            type=None
+        )
         env['id'] = environment['id']
         env['name'] = environment['name']
         env['is_production'] = environment['isProduction']
@@ -401,39 +428,40 @@ def run_module():
         global_deployment=None,
         vcores_production=dict(
             assigned=None,
-            reassigned=None
+            used=None
         ),
         vcores_sandbox=dict(
             assigned=None,
-            reassigned=None
+            used=None
         ),
         vcores_design=dict(
             assigned=None,
-            reassigned=None
+            used=None
         ),
         load_balancer=dict(
             assigned=None,
-            reassigned=None
+            used=None
         ),
         vpns=dict(
             assigned=None,
-            reassigned=None
+            used=None
         ),
 
     )
+    bg_usage = get_business_group_usage(module, result['id'])
     entitl['create_suborgs'] = child['entitlements']['createSubOrgs']
     entitl['create_environments'] = child['entitlements']['createEnvironments']
     entitl['global_deployment'] = child['entitlements']['globalDeployment']
     entitl['vcores_production']['assigned'] = child['entitlements']['vCoresProduction']['assigned']
-    entitl['vcores_production']['reassigned'] = child['entitlements']['vCoresProduction']['reassigned']
+    entitl['vcores_production']['used'] = bg_usage['production']
     entitl['vcores_sandbox']['assigned'] = child['entitlements']['vCoresSandbox']['assigned']
-    entitl['vcores_sandbox']['reassigned'] = child['entitlements']['vCoresSandbox']['reassigned']
+    entitl['vcores_sandbox']['used'] = bg_usage['sandbox']
     entitl['vcores_design']['assigned'] = child['entitlements']['vCoresDesign']['assigned']
-    entitl['vcores_design']['reassigned'] = child['entitlements']['vCoresDesign']['reassigned']
+    entitl['vcores_design']['used'] = bg_usage['design']
     entitl['load_balancer']['assigned'] = child['entitlements']['loadBalancer']['assigned']
-    entitl['load_balancer']['reassigned'] = child['entitlements']['loadBalancer']['reassigned']
+    entitl['load_balancer']['used'] = bg_usage['load_balancers']
     entitl['vpns']['assigned'] = child['entitlements']['vpns']['assigned']
-    entitl['vpns']['reassigned'] = child['entitlements']['vpns']['reassigned']
+    entitl['vpns']['used'] = bg_usage['vpns']
     result['entitlements'] = entitl
 
     module.exit_json(**result)
