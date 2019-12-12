@@ -98,6 +98,7 @@ options:
     icon:
         description:
             - Path to the asset icon file.
+            - Supported extensions: svg, png, jpg, jpeg
         type: path
         required: false
     maven:
@@ -419,12 +420,12 @@ def set_asset_icon(module):
         output = 'Asset icon deleted (if any)'
     else:
         icon_extension = os.path.splitext(module.params['icon'])[1]
-        if (icon_extension == '.png'):
+        if (icon_extension == '.png') or (icon_extension == '.jpeg') or (icon_extension == '.jpg'):
             headers.update({'Content-Type': 'image/png'})
         elif (icon_extension == '.svg'):
             headers.update({'Content-Type': 'image/svg+xml'})
         else:
-            module.fail_json(msg=('Unsupported extension [' + icon_extension + ']. Supported only png and svg'))
+            module.fail_json(msg=('Unsupported extension [' + icon_extension + ']. Supported ones: svg, png, jpg, jpeg'))
         f = open(module.params['icon'], 'rb')
         payload = f.read()
         f.close()
