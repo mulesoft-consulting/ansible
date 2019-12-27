@@ -39,7 +39,8 @@ options:
         default: anypoint.mulesoft.com
     parent_id:
         description:
-            - The org id of the parent (if empty then master org is default)
+            - The org id of the parent 
+            - if empty then either master org is default or master org is the target
 
 author:
     - Gonzalo Camino (@gonzalo-camino)
@@ -369,34 +370,46 @@ def run_module():
     output = execute_anypoint_cli(module, cmd)
 
     resp_json = json.loads(output)
+    target_is_master = False
     for org in resp_json:
         if (module.params['parent_id'] is None or module.params['parent_id'] == ''):
             if (org['Type'] == 'Master'):
-                parent['id'] = org['Id']
-                parent['name'] = org['Name']
+                if (module.params['name'] == org['Name']):
+                    target_is_master = True
+                    result['id'] = org['Id']
+                    result['name'] = org['Name']
+                else:
+                    parent['id'] = org['Id']
+                    parent['name'] = org['Name']
+                
                 break
         else:
             if (org['Id'] == module.params['parent_id']):
                 parent['id'] = org['Id']
                 parent['name'] = org['Name']
                 break
+    if (target_is_master == False):
+        # check if business group exists within parent subOrgs
+        if (parent['id'] is not None):
+            tmp_parent = get_organization(module, parent['id'])
+            for child_id in tmp_parent['subOrganizationIds']:
+                child = get_organization(module, child_id)
+                if (child['name'] == module.params['name']):
+                    result['id'] = child['id']
+                    result['name'] = module.params['name']
+                    result['client_id'] = child['clientId']
+                    result['client_secret'] = get_business_group_client_secret(module, child['id'], child['clientId'])
+                    break
+        else:
+            module.fail_json(msg="parent org not found")
 
-    # check if business group exists within parent subOrgs
-    if (parent['id'] is not None):
-        tmp_parent = get_organization(module, parent['id'])
-        for child_id in tmp_parent['subOrganizationIds']:
-            child = get_organization(module, child_id)
-            if (child['name'] == module.params['name']):
-                result['id'] = child['id']
-                result['name'] = module.params['name']
-                result['client_id'] = child['clientId']
-                result['client_secret'] = get_business_group_client_secret(module, child['id'], child['clientId'])
-                break
+        if (result['id'] is None):
+            module.exit_json(**result)
     else:
-        module.fail_json(msg="parent org not found")
-
-    if (result['id'] is None):
-        module.exit_json(**result)
+        # child variable is master org
+        child = get_organization(module, result['id'])
+        result['client_id'] = child['clientId']
+        result['client_secret'] = get_business_group_client_secret(module, result['id'], result['client_id'])
 
     # finally map the rest of the result
     result['is_master'] = child['isMaster']
