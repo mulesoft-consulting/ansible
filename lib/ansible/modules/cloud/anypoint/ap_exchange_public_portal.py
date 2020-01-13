@@ -105,7 +105,7 @@ EXAMPLES = '''
 # Leave the portal with default settings
 - name: update exchange public portal with no content
   ap_exchange_public_portal_page:
-    state: 'absent'
+    state: 'default'
     bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
 '''
 
