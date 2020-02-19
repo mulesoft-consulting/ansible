@@ -573,9 +573,9 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
             elif ((module.params['type'] == 'policy') and (file_extension == '.jar')):
                 deploy_cmd += ' -Dclassifier=mule-policy'
             elif ((module.params['type'] == 'example') and (file_extension == '.jar')):
-                deploy_cmd += ' -Dclassigier=mule-application-example'
+                deploy_cmd += ' -Dclassifier=mule-application-example'
             elif ((module.params['type'] == 'template') and (file_extension == '.jar')):
-                deploy_cmd += ' -Dclassigier=mule-application-template'
+                deploy_cmd += ' -Dclassifier=mule-application-template'
             else:
                 module.fail_json(msg='invalid file extension for ' + module.params['type'] + ' asset type (only supported .zip for mule 3 and .jar for mule 4)')
             deploy_cmd += ' -Durl=' + get_distribution_repository_url(module)

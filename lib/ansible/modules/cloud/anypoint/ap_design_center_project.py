@@ -64,7 +64,7 @@ options:
         required: false
     project_dir:
         description:
-            - Directory with project files. Optional for C(present) and C(published) states if type is C(raml-fragment)
+            - Directory with project files. Optional for C(present) and C(published) states
         required: false
     exchange_metadata:
         description:
