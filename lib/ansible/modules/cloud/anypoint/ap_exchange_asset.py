@@ -217,7 +217,7 @@ def get_asset_identifier(group_id, asset_id, asset_version):
 def execute_anypoint_cli(module, cmd):
     result = module.run_command(cmd)
     if result[0] != 0:
-        module.fail_json(msg='[execute_anypoint_cli]' + result[1])
+        module.fail_json(msg='[execute_anypoint_cli] ' + result[1])
 
     return result[1]
 
@@ -230,6 +230,15 @@ def execute_maven(module, cmd):
         module.fail_json(msg='[execute_maven]' + result[1])
 
     return result[1]
+
+
+def get_exchange1_url(module, need_version):
+    url = 'https://' + module.params['host'] + '/exchange/api/v1/organizations/' + module.params['organization_id'] + '/assets/'
+    if (need_version is True):
+        url += get_asset_identifier(module.params['group_id'], module.params['asset_id'], module.params['asset_version'])
+    else:
+        url += module.params['group_id'] + '/' + module.params['asset_id']
+    return url
 
 
 def get_exchange_url(module, need_version):
@@ -345,7 +354,6 @@ def get_context(module, cmd_base):
                 return_value['do_nothing'] = (return_value['deprecated'] is True)
     elif (module.params['state'] == "absent"):
         return_value['do_nothing'] = not return_value['exists']
-
     return return_value
 
 
@@ -590,6 +598,14 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
     return return_value
 
 
+def delete_exchange_asset(module):
+    my_url = get_exchange1_url(module, True)
+    headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
+    execute_http_call('[delete_exchange_asset]', module, my_url, 'DELETE', headers, None)
+
+    return 'Asset deleted'
+
+
 def run_module():
     # define maven spec
     maven_spec = dict(
@@ -702,9 +718,7 @@ def run_module():
         deprecate_cmd += ' deprecate "' + asset_identifier + '"'
         output = execute_anypoint_cli(module, deprecate_cmd)
     elif (module.params['state'] == 'absent'):
-        delete_cmd = cmd_base
-        delete_cmd += ' delete "' + asset_identifier + '"'
-        output = execute_anypoint_cli(module, delete_cmd)
+        output = delete_exchange_asset(module)
 
     result['msg'] = output.replace('\n', '')
     result['changed'] = True

@@ -162,7 +162,7 @@ def get_anypointcli_path(module):
     return module.get_bin_path('anypoint-cli', True, ['/usr/local/bin'])
 
 
-def execute_http_call(module, url, method, headers, payload):
+def execute_http_call(caller, module, url, method, headers, payload):
     return_value = None
     try:
         if (headers is not None):
@@ -172,7 +172,7 @@ def execute_http_call(module, url, method, headers, payload):
                 return_value = open_url(url, method=method, headers=headers)
 
     except Exception as e:
-        module.fail_json(msg=str(e))
+        module.fail_json(msg=caller + ' ' + str(e))
 
     return return_value
 
@@ -215,7 +215,7 @@ def do_no_action_exchange(module):
                  'version: "'+ module.params['exchange_metadata']['asset_version'] +'"}) {assetId groupId version type name}}'
     }
 
-    output = json.load(execute_http_call(module, my_url, 'POST', headers, json.dumps(payload)))
+    output = json.load(execute_http_call('[do_no_action_exchange]', module, my_url, 'POST', headers, json.dumps(payload)))
     # check if the environment exists
     if (output['data'] is not None):
         for item in output['data']['assets']:
@@ -331,17 +331,35 @@ def publish_project_to_exchange(module, cmd_base):
     return result
 
 
-def unpublish_project_from_exchange(module):
-    asset_identifier = module.params['exchange_metadata']['group_id'] + "/" 
-    asset_identifier += module.params['exchange_metadata']['asset_id'] + "/"
-    asset_identifier += module.params['exchange_metadata']['asset_version']
-    cmd_final = get_anypointcli_path(module) + " --bearer=\"" + module.params['bearer'] + "\""
-    cmd_final += " --host=\"" + module.params['host'] + "\""
-    cmd_final += " --organization=\"" + module.params['organization'] + "\""
-    cmd_final += " exchange asset delete "
-    cmd_final += ' "' + asset_identifier + '"'
+def get_asset_identifier(group_id, asset_id, asset_version):
+    return group_id + '/' + asset_id + '/' + asset_version
 
-    return module.run_command(cmd_final)
+
+def get_exchange1_url(module, need_version):
+    url = 'https://' + module.params['host'] + '/exchange/api/v1/organizations/' + module.params['organization_id'] + '/assets/'
+    if (need_version is True):
+        url += get_asset_identifier(module.params['exchange_metadata']['group_id'], module.params['exchange_metadata']['asset_id'], module.params['exchange_metadata']['asset_version'])
+    else:
+        url += module.params['group_id'] + '/' + module.params['asset_id']
+    return url
+
+
+def unpublish_project_from_exchange(module):
+    #asset_identifier = module.params['exchange_metadata']['group_id'] + "/" 
+    #asset_identifier += module.params['exchange_metadata']['asset_id'] + "/"
+    #asset_identifier += module.params['exchange_metadata']['asset_version']
+    #cmd_final = get_anypointcli_path(module) + " --bearer=\"" + module.params['bearer'] + "\""
+    #cmd_final += " --host=\"" + module.params['host'] + "\""
+    #cmd_final += " --organization=\"" + module.params['organization'] + "\""
+    #cmd_final += " exchange asset delete "
+    #cmd_final += ' "' + asset_identifier + '"'
+    #return module.run_command(cmd_final)
+    my_url = get_exchange1_url(module, True)
+    headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
+    execute_http_call('[unpublish_project_from_exchange]', module, my_url, 'DELETE', headers, None)
+    return_value = [0, 'Asset unpublished from Exchange']
+    
+    return return_value
 
 
 def delete_project(module, cmd_base):
