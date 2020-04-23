@@ -60,7 +60,7 @@ options:
         description:
             - Fragment type. Required for C(present) and C(published) states if type is C(raml-fragment)
         default: trait
-        choices: [ "trait", "resource-type", "library", "type", "user-documentation" ]
+        choices: [ "trait", "resource-type", "library", "type", "user-documentation", "example" ]
         required: false
     project_dir:
         description:
@@ -212,7 +212,7 @@ def do_no_action_exchange(module):
     payload = {
         'query': '{assets(asset:{groupId: "' + module.params['exchange_metadata']['group_id'] + '",'
                  'assetId: "' + module.params['exchange_metadata']['asset_id'] + '",'
-                 'version: "'+ module.params['exchange_metadata']['asset_version'] +'"}) {assetId groupId version type name}}'
+                 'version: "' + module.params['exchange_metadata']['asset_version'] + '"}) {assetId groupId version type name}}'
     }
 
     output = json.load(execute_http_call('[do_no_action_exchange]', module, my_url, 'POST', headers, json.dumps(payload)))
@@ -241,7 +241,8 @@ def do_no_action(module, cmd_base):
 
 
 def get_uuid_regex():
-    return '[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}'
+    # return '[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}'
+    return r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 
 
 def get_org_id_regex():
@@ -277,8 +278,8 @@ def prepare_project_to_upload(project_dir, org_id):
     shutil.rmtree(project_dir + '/exchange_modules', ignore_errors=True, onerror=None)
     # replace org id in exchange.json file
     exchange_file = os.path.join(project_dir, 'exchange.json')
-    regex = '"groupId":\s?"' + get_org_id_regex() + '"'
-    new_string = '"groupId": "' + org_id + '"'
+    regex = r'"groupId":\s?"' + get_org_id_regex() + r'"'
+    new_string = r'"groupId": "' + org_id + r'"'
     replace_file_str_regex(exchange_file, regex, new_string)
 
     # replace org id in all .raml files ()
@@ -286,7 +287,7 @@ def prepare_project_to_upload(project_dir, org_id):
     for file in os.listdir(project_dir):
         if file.endswith(".raml"):
             raml_file = os.path.join(project_dir, file)
-            regex = 'exchange_modules\/' + get_org_id_regex() + '\/'
+            regex = r'exchange_modules\/' + get_org_id_regex() + r'\/'
             new_string = 'exchange_modules/' + org_id + '/'
             replace_file_str_regex(raml_file, regex, new_string)
 
@@ -338,27 +339,19 @@ def get_asset_identifier(group_id, asset_id, asset_version):
 def get_exchange1_url(module, need_version):
     url = 'https://' + module.params['host'] + '/exchange/api/v1/organizations/' + module.params['organization_id'] + '/assets/'
     if (need_version is True):
-        url += get_asset_identifier(module.params['exchange_metadata']['group_id'], module.params['exchange_metadata']['asset_id'], module.params['exchange_metadata']['asset_version'])
+        ex_meta = module.params['exchange_metadata']
+        url += get_asset_identifier(ex_meta['group_id'], ex_meta['asset_id'], ex_meta['asset_version'])
     else:
         url += module.params['group_id'] + '/' + module.params['asset_id']
     return url
 
 
 def unpublish_project_from_exchange(module):
-    #asset_identifier = module.params['exchange_metadata']['group_id'] + "/" 
-    #asset_identifier += module.params['exchange_metadata']['asset_id'] + "/"
-    #asset_identifier += module.params['exchange_metadata']['asset_version']
-    #cmd_final = get_anypointcli_path(module) + " --bearer=\"" + module.params['bearer'] + "\""
-    #cmd_final += " --host=\"" + module.params['host'] + "\""
-    #cmd_final += " --organization=\"" + module.params['organization'] + "\""
-    #cmd_final += " exchange asset delete "
-    #cmd_final += ' "' + asset_identifier + '"'
-    #return module.run_command(cmd_final)
     my_url = get_exchange1_url(module, True)
     headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
     execute_http_call('[unpublish_project_from_exchange]', module, my_url, 'DELETE', headers, None)
     return_value = [0, 'Asset unpublished from Exchange']
-    
+
     return return_value
 
 
@@ -388,7 +381,7 @@ def run_module():
         organization=dict(type='str', required=True),
         organization_id=dict(type='str', required=False),
         type=dict(type='str', required=False, default="raml", choices=["raml", "raml-fragment"]),
-        fragment_type=dict(type='str', required=False, default="trait", choices=["trait", "resource-type", "library", "type", "user-documentation"]),
+        fragment_type=dict(type='str', required=False, default="trait", choices=["trait", "resource-type", "library", "type", "user-documentation", "example"]),
         project_dir=dict(type='str', required=False),
         exchange_metadata=dict(type='dict', options=exchange_metadata_spec)
     )
