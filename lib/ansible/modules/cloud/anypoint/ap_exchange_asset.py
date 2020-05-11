@@ -498,11 +498,28 @@ def modify_pom_file(module, source_pom):
     actifact_id_elem = root.find('{http://maven.apache.org/POM/4.0.0}artifactId')
     group_id_elem = root.find('{http://maven.apache.org/POM/4.0.0}groupId')
     name_elem = root.find('{http://maven.apache.org/POM/4.0.0}name')
+    build_elem = root.find('{http://maven.apache.org/POM/4.0.0}build')
+    dependencies_elem = root.find('{http://maven.apache.org/POM/4.0.0}dependencies')
     # modify with supplied values
     version_elem.text = module.params['asset_version']
     actifact_id_elem.text = module.params['asset_id']
     group_id_elem.text = module.params['group_id']
     name_elem.text = module.params['name']
+    # update classifier
+    plugins_elem = build_elem.find('{http://maven.apache.org/POM/4.0.0}plugins')
+    for plugin in plugins_elem.findall('{http://maven.apache.org/POM/4.0.0}plugin'):
+        if (plugin.find('{http://maven.apache.org/POM/4.0.0}artifactId').text == 'mule-maven-plugin'):
+            classifier_elem = plugin.find('{http://maven.apache.org/POM/4.0.0}configuration').find('{http://maven.apache.org/POM/4.0.0}classifier')
+            if (module.params['type'] == 'example'):
+                tmp_classifier = 'mule-application-example'
+            elif (module.params['type'] == 'template'):
+                tmp_classifier = 'mule-application-template'
+            classifier_elem.text = tmp_classifier
+    # replace '${bg_id}' with group_id, only used on automation use cases
+    for dependency in dependencies_elem.findall('{http://maven.apache.org/POM/4.0.0}dependency'):
+        tmp_elem = dependency.find('{http://maven.apache.org/POM/4.0.0}groupId')
+        if (tmp_elem.text == r'${bg_id}'):
+            tmp_elem.text = module.params['group_id']
     # finally write out content to the pom.xml file
     tree.write(source_pom)
 
@@ -548,7 +565,7 @@ def upload_exchange_asset(module, cmd_base, asset_identifier):
                 # update group id, artifact id and version on the selected pom.xml
                 modify_pom_file(module, source_pom)
                 deploy_cmd += ' -f "' + source_pom + '"'
-                # add specific variables
+                # add specified variables
                 if (module.params['maven'] is not None and module.params['maven'].get('arguments')):
                     user_args = ''
                     user_args += " -D".join(module.params['maven'].get('arguments'))
