@@ -109,7 +109,7 @@ def get_exchange_url(module, org_id):
 
 
 def execute_http_call(module, url, method, headers, payload):
-    return_Value = None
+    return_value = None
     try:
         if (headers is not None):
             if (payload is not None):
