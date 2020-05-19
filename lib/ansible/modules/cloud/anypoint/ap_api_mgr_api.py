@@ -225,9 +225,11 @@ def get_context(module, cmd_base):
         module.fail_json(msg=result[1])
 
     if not result[1].strip():
-        return return_value
+        # no results comming from API Manager, so no APIs managed at all
+        resp_json = []
+    else:
+        resp_json = json.loads(result[1])
 
-    resp_json = json.loads(result[1])
     # check if the API is already managed
     for item in resp_json:
         if (item['Asset ID'] == module.params['name']) and (item['Asset Version'] == module.params['asset_version']):
