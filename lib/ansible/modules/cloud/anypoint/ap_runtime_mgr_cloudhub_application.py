@@ -126,16 +126,6 @@ options:
                     - API instance id (required for autodiscovery)
                     - The property name is "api.autodiscovery.id"
                 required: false
-            api_client_id:
-                description:
-                    - API Manager application client id
-                    - The property name is "app.client_id"
-                required: false
-            api_client_secret:
-                description:
-                    - API Manager application client secret
-                    - The property name is "app.client_secret"
-                required: false
             env_client_id:
                 description:
                     - Environment client id to register to API Manager
@@ -147,6 +137,20 @@ options:
                     - Environment client secret to register to API Manager
                     - The property name is "anypoint.platform.client_secret"
                     - This value is mandatory if you specified "api_id"
+                required: false
+    app_credentials:
+        description:
+            - These credentials are for the Exchange application associated to this implementation.
+        suboptions:
+            client_id:
+                description:
+                    - Exchange application Client Id
+                    - The property name is "app.client_id"
+                required: false
+            client_secret:
+                description:
+                    - Exchange application Client Secret
+                    - The property name is "app.client_secret"
                 required: false
     visualizer:
         description:
@@ -413,10 +417,10 @@ def create_or_update_cloudhub_application(module, cmd_base, context):
         if (module.params.get('api_manager') is not None):
             if (module.params['api_manager'].get('api_id') is not None):
                 cmd_final += ' --property "' + r'api.autodiscovery.id\=' + module.params['api_manager'].get('api_id') + '"'
-            if (module.params['api_manager'].get('api_client_id') is not None):
-                cmd_final += ' --property "' + r'api.client_id\=' + module.params['api_manager'].get('api_client_id') + '"'
-            if (module.params['api_manager'].get('api_client_secret') is not None):
-                cmd_final += ' --property "' + r'api.client_secret\=' + module.params['api_manager'].get('api_client_secret') + '"'
+            if (module.params['app_credentials'].get('client_id') is not None):
+                cmd_final += ' --property "' + r'app.client_id\=' + module.params['app_credentials'].get('client_id') + '"'
+            if (module.params['app_credentials'].get('client_secret') is not None):
+                cmd_final += ' --property "' + r'app.client_secret\=' + module.params['app_credentials'].get('client_secret') + '"'
             if (module.params['api_manager'].get('env_client_id') is not None):
                 cmd_final += ' --property "' + r'anypoint.platform.client_id\=' + module.params['api_manager'].get('env_client_id') + '"'
             if (module.params['api_manager'].get('env_client_secret') is not None):
@@ -499,13 +503,14 @@ def delete_cloudhub_application(module, cmd_base, context):
 
 def run_module():
     # define suboptions
+    app_credentials_spec = dict(
+        client_id=dict(type='str', required=False),
+        client_secret=dict(type='str', required=False),
+    )
     api_manager_spec = dict(
         api_id=dict(type='str', required=False),
-        api_client_id=dict(type='str', required=False),
-        api_client_secret=dict(type='str', required=False),
         env_client_id=dict(type='str', required=False),
         env_client_secret=dict(type='str', required=False)
-
     )
     visualizer_spec = dict(
         display_name=dict(type='str', required=False),
@@ -544,6 +549,7 @@ def run_module():
         properties=dict(type='list', required=False),
         properties_file=dict(type='str', required=False),
         api_manager=dict(type='dict', options=api_manager_spec, required=False),
+        app_credentials=dict(type='dict', options=app_credentials_spec, required=False),
         visualizer=dict(type='dict', options=visualizer_spec, required=False),
         monitoring_enabled=dict(type='bool', required=False, default=False),
         consumes=dict(type='list', elements='dict', options=api_consumed_spec, required=False, default=[])
@@ -590,7 +596,7 @@ def run_module():
             if (module.params['api_manager'].get('api_id') is not None):
                 if ((module.params['api_manager'].get('env_client_id') is None)
                         or (module.params['api_manager'].get('env_client_secret') is None)):
-                    module.fail_json(msg="to register the app with api manager the hre parameters 'api_id', 'env_client_id' and 'env_client_secret' must be present")
+                    module.fail_json(msg="to register the app with api manager the parameters 'api_id', 'env_client_id' and 'env_client_secret' must be present")
     # no specific parameters for other states needs to be checked
 
     # if the user is working with this module in only check mode we do not
