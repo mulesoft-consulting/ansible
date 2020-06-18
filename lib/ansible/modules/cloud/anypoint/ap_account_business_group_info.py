@@ -44,9 +44,6 @@ options:
 
 author:
     - Gonzalo Camino (@gonzalo-camino)
-
-requirements:
-    - anypoint-cli
 '''
 
 EXAMPLES = '''
@@ -208,53 +205,11 @@ entitlements:
 '''
 
 import json
+from ansible.module_utils.cloud.anypoint import ap_common
+from ansible.module_utils.cloud.anypoint import ap_account_common
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.six.moves.urllib.parse import urlencode
 from ansible.module_utils.urls import open_url
-
-
-def get_anypointcli_path(module):
-    return module.get_bin_path('anypoint-cli', True, ['/usr/local/bin'])
-
-
-def execute_anypoint_cli(module, cmd):
-    result = module.run_command(cmd)
-    if result[0] != 0:
-        module.fail_json(msg=result[1].replace('\n', ''))
-
-    return result[1]
-
-
-def execute_http_call(module, url, method, headers, payload):
-    return_value = None
-    try:
-        if (headers is not None):
-            if (payload is not None):
-                return_value = open_url(url, method=method, headers=headers, data=payload)
-            else:
-                return_value = open_url(url, method=method, headers=headers)
-
-    except Exception as e:
-        module.fail_json(msg=str(e))
-
-    return return_value
-
-
-def get_business_group_client_secret(module, bg_id, bg_client_id):
-    return_value = None
-    server_name = 'https://' + module.params['host']
-    api_endpoint = '/accounts/api/organizations/' + bg_id + '/clients/' + bg_client_id
-    my_url = server_name + api_endpoint
-
-    headers = {
-        'Accept': 'application/json',
-        'Authorization': 'bearer ' + module.params['bearer']
-    }
-
-    resp_json = json.load(execute_http_call(module, my_url, 'GET', headers, None))
-    return_value = resp_json['client_secret']
-
-    return return_value
 
 
 def get_business_group_usage(module, bg_id):
@@ -274,47 +229,12 @@ def get_business_group_usage(module, bg_id):
         'Authorization': 'bearer ' + module.params['bearer']
     }
 
-    resp_json = json.load(execute_http_call(module, my_url, 'GET', headers, None))
+    resp_json = ap_common.execute_http_call('[get_business_group_usage]', module, my_url, 'GET', headers, None)
     return_value['production'] = resp_json['productionVCoresConsumed']
     return_value['sandbox'] = resp_json['sandboxVCoresConsumed']
     return_value['design'] = resp_json['designVCoresConsumed']
     return_value['load_balancers'] = resp_json['loadBalancersConsumed']
     return_value['vpns'] = resp_json['vpnsConsumed']
-
-    return return_value
-
-
-def get_organization(module, org_id):
-    return_value = None
-    server_name = 'https://' + module.params['host']
-    api_endpoint = '/accounts/api/organizations/' + org_id
-    my_url = server_name + api_endpoint
-
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': 'bearer ' + module.params['bearer']
-    }
-    try:
-        return_value = json.load(open_url(url=my_url, method='GET', headers=headers))
-    except Exception as e:
-        error_str = str(e)
-        if (error_str == "HTTP Error 401: Unauthorized"):
-            return_value = {'name': None}
-        else:
-            module.fail_json(msg=error_str)
-
-    return return_value
-
-
-def get_context(module):
-    return_value = dict(
-        parent_id=None,
-        target_id=None,
-        target_client_id=None,
-        target_client_secret=None,
-        do_nothing=False,
-        needs_update=False
-    )
 
     return return_value
 
@@ -354,70 +274,60 @@ def run_module():
     )
 
     # Main Module Logic
-    # first all check that the anypoint-cli binary is present on the host
-    if (get_anypointcli_path(module) is None):
-        module.fail_json(msg="anypoint-cli binary not present on host")
-
+    if (module.params['parent_id'] == ''):
+        module.params['parent_id'] = None
     # exit if the execution is in check_mode
     if module.check_mode:
         module.exit_json(**result)
 
-    # exit if I need to do nothing, so check if environment exists
-    bearer_arg = '--bearer="' + module.params['bearer'] + '"'
-    host_arg = '--host="' + module.params['host'] + '"'
-    args = 'account business-group list --output json'
-    cmd = get_anypointcli_path(module) + ' ' + bearer_arg + ' ' + host_arg + ' ' + args
-    output = execute_anypoint_cli(module, cmd)
+    org_list = ap_account_common.get_organizations_list(module)
+    # first I need to identify the master org
+    master_org = next(filter(lambda x: x['isMaster'] == True, org_list), None)
+    if (master_org is None):
+        module.fail_json(msg='[run_module] Error getting information about the master organization')
+    # then, set the master org if no parent_id is present
+    tmp_parent_id = module.params['parent_id']
+    if (tmp_parent_id is None):
+        tmp_parent_id = master_org['id']
 
-    resp_json = json.loads(output)
-    target_is_master = False
-    for org in resp_json:
-        if (module.params['parent_id'] is None or module.params['parent_id'] == ''):
-            if (org['Type'] == 'Master'):
-                if (module.params['name'] == org['Name']):
-                    target_is_master = True
-                    result['id'] = org['Id']
-                    result['name'] = org['Name']
-                else:
-                    parent['id'] = org['Id']
-                    parent['name'] = org['Name']
-                
-                break
-        else:
-            if (org['Id'] == module.params['parent_id']):
-                parent['id'] = org['Id']
-                parent['name'] = org['Name']
-                break
-    if (target_is_master == False):
-        # check if business group exists within parent subOrgs
-        if (parent['id'] is not None):
-            tmp_parent = get_organization(module, parent['id'])
-            for child_id in tmp_parent['subOrganizationIds']:
-                child = get_organization(module, child_id)
-                if (child['name'] == module.params['name']):
-                    result['id'] = child['id']
-                    result['name'] = module.params['name']
-                    result['client_id'] = child['clientId']
-                    result['client_secret'] = get_business_group_client_secret(module, child['id'], child['clientId'])
-                    break
-        else:
-            module.fail_json(msg="parent org not found")
+    # now I need to iterate on the org list to get the right one
+    for org in org_list:
+        if (tmp_parent_id == org['parentId'] and module.params['name'] == org['name']):
+            parent['id'] = org['parentId']
+            parent['name'] = org['parentName']
+            result['id'] = org['id']
+            result['name'] = org['name']
+            result['client_id'] = org['clientId']
+            result['is_master'] = org['isMaster']
+            result['is_federated'] = org['isFederated']
+            result['idprovider_id'] = org['idprovider_id']
+            result['owner_id'] = org['ownerId']
+            result['created_at'] = org['createdAt']
+            result['parent'] = parent
+            break
 
-        if (result['id'] is None):
+    # now I need to process the exceptions
+    if (result['id'] is None):
+        if (master_org['name'] != module.params['name']):
+            # target org not found
             module.exit_json(**result)
-    else:
-        # child variable is master org
-        child = get_organization(module, result['id'])
-        result['client_id'] = child['clientId']
-        result['client_secret'] = get_business_group_client_secret(module, result['id'], result['client_id'])
-
-    # finally map the rest of the result
-    result['is_master'] = child['isMaster']
-    result['is_federated'] = child['isFederated']
-    result['idprovider_id'] = child['idprovider_id']
-    result['owner_id'] = child['ownerId']
-    result['created_at'] = child['createdAt']
-    result['parent'] = parent
+        else:
+            # target org is the master org
+            parent['id'] = master_org['parentId']
+            parent['name'] = master_org['parentName']
+            result['id'] = master_org['id']
+            result['name'] = master_org['name']
+            result['client_id'] = master_org['clientId']
+            result['is_master'] = master_org['isMaster']
+            result['is_federated'] = master_org['isFederated']
+            result['idprovider_id'] = master_org['idprovider_id']
+            result['owner_id'] = master_org['ownerId']
+            result['created_at'] = master_org['createdAt']
+            result['parent'] = parent
+            
+    # map the rest of the org info
+    result['client_secret'] = ap_account_common.get_business_group_client_secret(module, result['id'], result['client_id'])
+    child = ap_account_common.get_organization(module, result['id'])
     # environments
     result['environments'] = []
     for environment in child['environments']:

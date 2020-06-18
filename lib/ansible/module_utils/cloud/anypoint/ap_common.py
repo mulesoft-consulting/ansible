@@ -34,4 +34,6 @@ def execute_http_call(caller, module, url, method, headers, payload):
     except Exception as e:
         module.fail_json(msg=caller + ' Error executing HTTP call ' + method + ' to ' + url + ' [' + str(e) + ']')
 
+    return_value = json.load(return_value)
+
     return return_value
