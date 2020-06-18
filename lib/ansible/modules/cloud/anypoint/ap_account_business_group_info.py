@@ -39,7 +39,7 @@ options:
         default: anypoint.mulesoft.com
     parent_id:
         description:
-            - The org id of the parent 
+            - The org id of the parent
             - if empty then either master org is default or master org is the target
 
 author:
@@ -282,7 +282,7 @@ def run_module():
 
     org_list = ap_account_common.get_organizations_list(module)
     # first I need to identify the master org
-    master_org = next(filter(lambda x: x['isMaster'] == True, org_list), None)
+    master_org = next(filter(lambda x: x['isMaster'] is True, org_list), None)
     if (master_org is None):
         module.fail_json(msg='[run_module] Error getting information about the master organization')
     # then, set the master org if no parent_id is present
@@ -324,7 +324,7 @@ def run_module():
             result['owner_id'] = master_org['ownerId']
             result['created_at'] = master_org['createdAt']
             result['parent'] = parent
-            
+
     # map the rest of the org info
     result['client_secret'] = ap_account_common.get_business_group_client_secret(module, result['id'], result['client_id'])
     child = ap_account_common.get_organization(module, result['id'])

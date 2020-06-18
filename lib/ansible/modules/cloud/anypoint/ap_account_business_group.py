@@ -184,7 +184,7 @@ def get_context(module):
     )
     org_list = ap_account_common.get_organizations_list(module)
     # first I need to identify the master org
-    master_org = next(filter(lambda x: x['isMaster'] == True, org_list), None)
+    master_org = next(filter(lambda x: x['isMaster'] is True, org_list), None)
     if (master_org is None):
         module.fail_json(msg='[get_context] Error getting information about the master organization')
     # then, set the master org if no parent_id is present
@@ -212,7 +212,11 @@ def get_context(module):
 
     # If I found it, then gather additional info
     if (return_value['target_id'] is not None):
-        return_value['target_client_secret'] = ap_account_common.get_business_group_client_secret(module, return_value['target_id'], return_value['target_client_id'])
+        return_value['target_client_secret'] = ap_account_common.get_business_group_client_secret(
+            module,
+            return_value['target_id'],
+            return_value['target_client_id']
+        )
         org_details = ap_account_common.get_organization(module, return_value['target_id'])
         return_value['needs_update'] = business_group_needs_update(module, org_details)
 
