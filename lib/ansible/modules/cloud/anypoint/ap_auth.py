@@ -63,8 +63,7 @@ msg:
 import json
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.six.moves.urllib.parse import urlencode
-from ansible.module_utils.urls import open_url
+from ansible.module_utils.cloud.anypoint import ap_common
 
 
 def run_module():
@@ -100,12 +99,13 @@ def run_module():
     headers = {'Content-Type': 'application/json'}
     payload = {"username": module.params['name'], "password": module.params['password']}
 
-    try:
-        resp = open_url(my_url, method="POST", headers=headers, data=json.dumps(payload))
-    except Exception as e:
-        module.fail_json(msg=str(e))
+    #try:
+    #    resp = open_url(my_url, method="POST", headers=headers, data=json.dumps(payload))
+    #except Exception as e:
+    #    module.fail_json(msg=str(e))
 
-    resp_json = json.loads(resp.read())
+    #resp_json = json.loads(resp.read())
+    resp_json = ap_common.execute_http_call('[run_module]', module, my_url, 'POST', headers, payload)
     result['access_token'] = resp_json["access_token"]
     result['message'] = 'Authenticated'
     result['changed'] = True
