@@ -326,7 +326,7 @@ def run_module():
             result['parent'] = parent
 
     # map the rest of the org info
-    result['client_secret'] = ap_account_common.get_business_group_client_secret(module, result['id'], result['client_id'])
+    result['client_secret'] = ap_account_common.get_organization_client_secret(module, result['id'], result['client_id'])
     child = ap_account_common.get_organization(module, result['id'])
     # environments
     result['environments'] = []

@@ -110,48 +110,8 @@ msg:
 import json
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.urls import open_url
-
-
-def get_anypointcli_path(module):
-    return module.get_bin_path('anypoint-cli', True, ['/usr/local/bin'])
-
-
-def execute_anypoint_cli(module, cmd):
-    result = module.run_command(cmd)
-    if result[0] != 0:
-        module.fail_json(msg=result[1])
-
-    return result[1]
-
-
-def execute_http_call(module, url, method, headers, payload):
-    return_value = None
-    try:
-        if (headers is not None):
-            if (payload is not None):
-                return_value = open_url(url, method=method, headers=headers, data=payload)
-            else:
-                return_value = open_url(url, method=method, headers=headers)
-
-    except Exception as e:
-        module.fail_json(msg='Error executinh HTTP call: ' + str(e))
-
-    return return_value
-
-
-def get_org_id(module):
-    org_id = None
-    my_url = 'https://' + module.params['host'] + '/accounts/api/profile'
-    headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
-    output = json.load(execute_http_call(module, my_url, 'GET', headers, None))
-    for item in output['memberOfOrganizations']:
-        if (item['name'] == module.params['organization']):
-            org_id = item['id']
-            break
-    if (org_id is None):
-        module.fail_json(msg='Business Group {' + module.params['organization'] + '} not found')
-
-    return org_id
+from ansible.module_utils.cloud.anypoint import ap_common
+from ansible.module_utils.cloud.anypoint import ap_account_common
 
 
 def get_environment(module, cmd_base):
@@ -172,23 +132,15 @@ def get_environment(module, cmd_base):
     return return_value
 
 
-def get_env_client_secret(module, org_id, client_id):
-    return_value = None
-    my_url = 'https://' + module.params['host'] + '/accounts/api/organizations/' + org_id + '/clients/' + client_id
-    headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
-    output = json.load(execute_http_call(module, my_url, 'GET', headers, None))
-
-    return output.get('client_secret')
-
-
 def get_context(module, cmd_base):
     return_value = dict(
         do_nothing=False,
         id=None,
         client_id=None,
-        client_secret=None
+        client_secret=None,
+        org_id=None
     )
-    org_id = None
+    return_value['org_id'] = ap_account_common.get_organization_id(module, module.params['organization'])
     resp_json = get_environment(module, cmd_base)
     if (resp_json != {}):
         return_value['id'] = resp_json['ID']
@@ -200,14 +152,18 @@ def get_context(module, cmd_base):
         if (return_value['id'] is None):
             return_value['do_nothing'] = False
         else:
-            client_secret = get_env_client_secret(module, get_org_id(module), return_value['client_id'])
+            client_secret = ap_account_common.get_organization_client_secret(
+                module,
+                return_value['org_id'],
+                return_value['client_id']
+            )
             return_value['client_secret'] = client_secret
             return_value['do_nothing'] = True
 
     return return_value
 
 
-def create_environment(module, cmd_base):
+def create_environment(module, context, cmd_base):
     return_value = dict(
         id=None,
         client_id=None,
@@ -217,12 +173,12 @@ def create_environment(module, cmd_base):
     cmd_final = cmd_base
     cmd_final += ' create --type ' + module.params['type']
     cmd_final += ' "' + module.params['name'] + '"'
-    resp = execute_anypoint_cli(module, cmd_final)
+    resp = ap_common.execute_anypoint_cli('[create_environment]', module, cmd_final)
 
     resp_json = get_environment(module, cmd_base)
     return_value['id'] = resp_json['ID']
     return_value['client_id'] = resp_json['Client ID']
-    client_secret = get_env_client_secret(module, get_org_id(module), return_value['client_id'])
+    client_secret = ap_account_common.get_organization_client_secret(module, context['org_id'], return_value['client_id'])
     return_value['client_secret'] = client_secret
     return_value['msg'] = 'environment created'
 
@@ -239,7 +195,7 @@ def delete_environment(module, cmd_base):
     cmd_final = cmd_base
     cmd_final += ' delete'
     cmd_final += ' "' + module.params['name'] + '"'
-    resp = execute_anypoint_cli(module, cmd_final)
+    resp = ap_common.execute_anypoint_cli('[delete_environment]', module, cmd_final)
     return_value['msg'] = 'environment deleted'
 
     return return_value
@@ -271,14 +227,14 @@ def run_module():
 
     # Main Module Logic
     # first all check that the anypoint-cli binary is present on the host
-    if (get_anypointcli_path(module) is None):
+    if (ap_common.get_anypointcli_path(module) is None):
         module.fail_json(msg="anypoint-cli binary not present on host")
 
     # exit if the execution is in check_mode
     if module.check_mode:
         module.exit_json(**result)
 
-    cmd = get_anypointcli_path(module) + ' --bearer="' + module.params['bearer'] + '"'
+    cmd = ap_common.get_anypointcli_path(module) + ' --bearer="' + module.params['bearer'] + '"'
     cmd += ' --organization="' + module.params['organization'] + '"'
     cmd += ' --host="' + module.params['host'] + '"'
     cmd += ' account environment'
@@ -295,7 +251,7 @@ def run_module():
 
     # Parameters set action
     if module.params['state'] == "present":
-        output = create_environment(module, cmd_base)
+        output = create_environment(module, context, cmd_base)
     elif module.params['state'] == "absent":
         output = delete_environment(module, cmd_base)
 

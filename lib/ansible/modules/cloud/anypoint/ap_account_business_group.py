@@ -212,7 +212,7 @@ def get_context(module):
 
     # If I found it, then gather additional info
     if (return_value['target_id'] is not None):
-        return_value['target_client_secret'] = ap_account_common.get_business_group_client_secret(
+        return_value['target_client_secret'] = ap_account_common.get_organization_client_secret(
             module,
             return_value['target_id'],
             return_value['target_client_id']
@@ -287,7 +287,7 @@ def create_business_group(module, context):
 
     return_value['bg_id'] = resp_json["id"]
     return_value['bg_client_id'] = resp_json["clientId"]
-    return_value['bg_client_secret'] = ap_account_common.get_business_group_client_secret(module, resp_json["id"], resp_json["clientId"])
+    return_value['bg_client_secret'] = ap_account_common.get_organization_client_secret(module, resp_json["id"], resp_json["clientId"])
 
     return return_value
 
