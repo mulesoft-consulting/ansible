@@ -42,9 +42,9 @@ options:
             - The org id of the parent
             - If empty then either master org is default or master org is the target
     as_org_admin:
-        descirption:
+        description:
             - Get information as Organization Administrator
-            - When is set to C(true) it returns the C(client_secret) of the business group as well
+            - When this is set to C(true) it returns the client_secret and the usage of the business group
         required: false
         default: false
 
@@ -109,6 +109,7 @@ parent:
         - info about parent org
         - it is empty if business group is the master org
     type: dict
+    returned: success
     contains:
         id:
             description: Parent Org ID
@@ -379,20 +380,22 @@ def run_module():
         ),
 
     )
-    bg_usage = get_business_group_usage(module, result['id'])
     entitl['create_suborgs'] = child['entitlements']['createSubOrgs']
     entitl['create_environments'] = child['entitlements']['createEnvironments']
     entitl['global_deployment'] = child['entitlements']['globalDeployment']
     entitl['vcores_production']['assigned'] = child['entitlements']['vCoresProduction']['assigned']
-    entitl['vcores_production']['used'] = bg_usage['production']
     entitl['vcores_sandbox']['assigned'] = child['entitlements']['vCoresSandbox']['assigned']
-    entitl['vcores_sandbox']['used'] = bg_usage['sandbox']
     entitl['vcores_design']['assigned'] = child['entitlements']['vCoresDesign']['assigned']
-    entitl['vcores_design']['used'] = bg_usage['design']
     entitl['load_balancer']['assigned'] = child['entitlements']['loadBalancer']['assigned']
-    entitl['load_balancer']['used'] = bg_usage['load_balancers']
     entitl['vpns']['assigned'] = child['entitlements']['vpns']['assigned']
-    entitl['vpns']['used'] = bg_usage['vpns']
+    if (module.params['as_org_admin'] is True):
+        bg_usage = get_business_group_usage(module, result['id'])
+        entitl['vcores_production']['used'] = bg_usage['production']
+        entitl['vcores_sandbox']['used'] = bg_usage['sandbox']
+        entitl['vcores_design']['used'] = bg_usage['design']
+        entitl['load_balancer']['used'] = bg_usage['load_balancers']
+        entitl['vpns']['used'] = bg_usage['vpns']
+
     result['entitlements'] = entitl
 
     module.exit_json(**result)
