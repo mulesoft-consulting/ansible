@@ -40,7 +40,13 @@ options:
     parent_id:
         description:
             - The org id of the parent
-            - if empty then either master org is default or master org is the target
+            - If empty then either master org is default or master org is the target
+    as_org_admin:
+        descirption:
+            - Get information as Organization Administrator
+            - When is set to C(true) it returns the C(client_secret) of the business group as well
+        required: false
+        default: false
 
 author:
     - Gonzalo Camino (@gonzalo-camino)
@@ -245,7 +251,8 @@ def run_module():
         bearer=dict(type='str', required=True),
         name=dict(type='str', required=True),
         host=dict(type='str', required=False, default='anypoint.mulesoft.com'),
-        parent_id=dict(type='str', required=False)
+        parent_id=dict(type='str', required=False),
+        as_org_admin=dict(type='bool', required=False, default=False)
     )
 
     result = dict(
@@ -326,7 +333,8 @@ def run_module():
             result['parent'] = parent
 
     # map the rest of the org info
-    result['client_secret'] = ap_account_common.get_organization_client_secret(module, result['id'], result['client_id'])
+    if (module.params['as_org_admin'] is True):
+        result['client_secret'] = ap_account_common.get_organization_client_secret(module, result['id'], result['client_id'])
     child = ap_account_common.get_organization(module, result['id'])
     # environments
     result['environments'] = []
