@@ -95,3 +95,20 @@ def get_user_profile(module):
     return_value = ap_common.execute_http_call('[get_user_profile]', module, my_url, 'GET', headers, None)
 
     return return_value
+
+
+def get_users_list(module, org_id, deleted):
+    return_value = None
+    server_name = 'https://' + module.params['host']
+    api_endpoint = '/accounts/api/organizations/' + org_id + '/users?deleted=' + str(deleted)
+    my_url = server_name + api_endpoint
+
+    headers = {
+        'Accept': 'application/json',
+        'Authorization': 'bearer ' + module.params['bearer']
+    }
+
+    resp_json = ap_common.execute_http_call('[get_users_list]', module, my_url, 'GET', headers, None)
+    return_value = resp_json['data']
+
+    return return_value
