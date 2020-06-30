@@ -25,15 +25,17 @@ def execute_http_call(caller, module, url, method, headers, payload):
     try:
         if (headers is not None):
             if (payload is not None):
-                return_value = open_url(url, method=method, headers=headers, data=json.dumps(payload))
+                response = open_url(url, method=method, headers=headers, data=json.dumps(payload))
             else:
-                return_value = open_url(url, method=method, headers=headers)
+                response = open_url(url, method=method, headers=headers)
         else:
             module.fail_json(msg=caller + ' Can not execute an HTTP call without headers')
 
     except Exception as e:
         module.fail_json(msg=caller + ' Error executing HTTP call ' + method + ' to ' + url + ' [' + str(e) + ']')
-
-    return_value = json.load(return_value)
+    
+    response = response.read()
+    if (response is not None and response != b''):
+        return_value = json.loads(response)
 
     return return_value
