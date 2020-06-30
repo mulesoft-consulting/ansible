@@ -157,10 +157,10 @@ def create_user(module):
         'Authorization': 'bearer ' + module.params['bearer']
     }
     payload = {
-        "username": module.params['name'], 
-        "firstName": module.params['first_name'], 
-        "lastName": module.params['last_name'], 
-        "email": module.params['email'], 
+        "username": module.params['name'],
+        "firstName": module.params['first_name'],
+        "lastName": module.params['last_name'],
+        "email": module.params['email'],
         "password": module.params['password']
     }
     resp_json = ap_common.execute_http_call('[create_user]', module, my_url, 'POST', headers, payload)
@@ -180,7 +180,7 @@ def change_user_enablement(module, context, enabled):
         'Authorization': 'bearer ' + module.params['bearer']
     }
     payload = [{
-        "id": context['id'], 
+        "id": context['id'],
         "enabled": enabled
     }]
     ap_common.execute_http_call('[change_user_enablement]', module, my_url, 'PUT', headers, payload)
@@ -200,8 +200,8 @@ def update_user(module, context):
         'Authorization': 'bearer ' + module.params['bearer']
     }
     payload = {
-        "firstName": module.params['first_name'], 
-        "lastName": module.params['last_name'], 
+        "firstName": module.params['first_name'],
+        "lastName": module.params['last_name'],
         "email": module.params['email']
     }
     ap_common.execute_http_call('[update_user]', module, my_url, 'PUT', headers, payload)
