@@ -63,8 +63,8 @@ author:
 EXAMPLES = '''
 # Example of creating an MQ client application
 - name: create an exchange application
-  ap_exchange_application:
-    name: 'My App'
+  ap_mq_client:
+    name: 'My Client'
     state: 'present'
     bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
     organization: 'My Demos'
@@ -72,8 +72,8 @@ EXAMPLES = '''
 
 # Example of deleting an MQ client application
 - name: delete an exchange application
-  ap_exchange_application:
-    name: 'My App'
+  ap_mq_client:
+    name: 'My Client'
     state: 'absent'
     bearer: 'fe819df3-92cf-407a-adcd-098ff64131f0'
 '''
