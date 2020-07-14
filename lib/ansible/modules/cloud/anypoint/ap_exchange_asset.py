@@ -72,12 +72,12 @@ options:
         default: 1.0.0
     api_version:
         description:
-            - The asset version
+            - The api version
         required: false
         default: 1.0
     main_file:
         description:
-            - Main file of the API asset.
+            - Main file of the API asset
             - Use it only for asset types "custom", "oas" and "wsdl"
         type: path
         required: false
@@ -98,8 +98,8 @@ options:
         required: false
     icon:
         description:
-            - Path to the asset icon file.
-            - Supported extensions: svg, png, jpg, jpeg
+            - Path to the asset icon file
+            - Supported extensions are svg, png, jpg, jpeg
         type: path
         required: false
     maven:
@@ -190,7 +190,7 @@ EXAMPLES = '''
 
 RETURN = '''
 msg:
-    description: Anypoint CLI command output
+    description: Operation result
     type: str
     returned: always
 '''
@@ -261,7 +261,7 @@ def get_context(module, cmd_base):
     if (module.params['state'] == "present") or (module.params['state'] == "deprecated"):
         if (return_value['exists'] is True):
             result = ap_exchange_common.analyze_asset(
-                module, module.params['group_id'],module.params['asset_id'],module.params['asset_version'],
+                module, module.params['group_id'], module.params['asset_id'], module.params['asset_version'],
                 module.params.get('name'), module.params.get('description'), module.params.get('icon'), module.params.get('tags'))
             return_value['exchange_must_update'] = result['must_update']
             return_value['exchange_must_update_name'] = result['must_update_name']
@@ -408,7 +408,10 @@ def upload_exchange_asset(module, context, cmd_base, asset_identifier):
                 # finally execute the maven command
                 execute_maven(module, deploy_cmd)
             else:
-                module.fail_json(msg='[upload_exchange_asset] asset type "template" or "example" requires either a project directory to build it or a file to just upload it')
+                module.fail_json(
+                    msg='[upload_exchange_asset] asset type "template" or "example" requires either a project directory'
+                        'to build it or a file to just upload it'
+                )
         else:
             # just upload provided file
             deploy_cmd += 'deploy:deploy-file'
@@ -434,17 +437,23 @@ def upload_exchange_asset(module, context, cmd_base, asset_identifier):
             elif ((module.params['type'] == 'template') and (file_extension == '.jar')):
                 deploy_cmd += ' -Dclassifier=mule-application-template'
             else:
-                module.fail_json(msg='[upload_exchange_asset] invalid file extension for ' + module.params['type'] + ' asset type (only supported .zip for mule 3 and .jar for mule 4)')
+                module.fail_json(
+                    msg='[upload_exchange_asset] invalid file extension for ' + module.params['type'] + ' asset type '
+                        '(only supported .zip for mule 3 and .jar for mule 4)'
+                )
             deploy_cmd += ' -Durl=' + get_distribution_repository_url(module)
             # finally execute the maven command
             execute_maven(module, deploy_cmd)
             # set the asset name: this is required just for extension asset type
-            ap_exchange_common.set_asset_name(module, module.params['group_id'], module.params['asset_id'], module.params['asset_version'], module.params['name'])
+            ap_exchange_common.set_asset_name(
+                module, module.params['group_id'], module.params['asset_id'], module.params['asset_version'], module.params['name']
+            )
 
     # update other fields if it is necessary
-    ap_exchange_common.modify_exchange_asset(module, 
-        module.params['group_id'], module.params['asset_id'], module.params['asset_version'],
-        context, module.params['name'], module.params['description'], module.params['icon'], module.params['tags'])
+    ap_exchange_common.modify_exchange_asset(
+        module, module.params['group_id'], module.params['asset_id'], module.params['asset_version'],
+        context, module.params['name'], module.params['description'], module.params['icon'], module.params['tags']
+    )
 
     return return_value
 
@@ -549,13 +558,19 @@ def run_module():
                 output = ap_common.execute_anypoint_cli('[run_module]', module, undeprecate_cmd)
             # if it exists and must change then modify
             if (context['exchange_must_update'] is True):
-                output = ap_exchange_common.modify_exchange_asset(module, module.params['group_id'], module.params['asset_id'], module.params['asset_version'], context, module.params['name'], module.params['description'], module.params['icon'], module.params['tags'])
+                output = ap_exchange_common.modify_exchange_asset(
+                    module, module.params['group_id'], module.params['asset_id'], module.params['asset_version'], context,
+                    module.params['name'], module.params['description'], module.params['icon'], module.params['tags']
+                )
     elif (module.params['state'] == 'deprecated'):
         if (context['exists'] is False):
             output = upload_exchange_asset(module, context, cmd_base, asset_identifier)
         # if it exists and must change then modify
         if (context['exchange_must_update'] is True):
-            output = ap_exchange_common.modify_exchange_asset(module, module.params['group_id'], module.params['asset_id'], module.params['asset_version'], context, module.params['name'], module.params['description'], module.params['icon'], module.params['tags'])
+            output = ap_exchange_common.modify_exchange_asset(
+                module, module.params['group_id'], module.params['asset_id'], module.params['asset_version'],
+                context, module.params['name'], module.params['description'], module.params['icon'], module.params['tags']
+            )
         # finally just deprecate the asset
         deprecate_cmd = cmd_base
         deprecate_cmd += ' deprecate "' + asset_identifier + '"'
