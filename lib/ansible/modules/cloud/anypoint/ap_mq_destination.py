@@ -240,9 +240,6 @@ def get_context(module):
         env_id=None,
         destination_id=None
     )
-    app_exists = False
-    url = None
-    description = None
 
     return_value['env_id'] = get_environment_id(module)
     dest_list = json.load(get_existing_destinations(module, return_value['env_id']))
@@ -299,6 +296,7 @@ def create_mq_destination(module, context):
         my_url += '/queues/' + module.params['name']
         payload = {
             'type': 'queue',
+            'fifo': str(module.params['attributes']['fifo']).lower(),
             'encrypted': module.params['attributes']['encrypted'],
             'defaultTtl': module.params['attributes']['default_ttl'],
             'defaultLockTtl': module.params['attributes']['default_lock_ttl']
@@ -390,7 +388,8 @@ def run_module():
     )
 
     # Main Module Logic
-
+    if ((module.params['attributes']['type'] == 'exchange') and (module.params['attributes']['fifo'] is True)):
+        module.fail_json(msg="cant' use 'fifo: true' with destination type 'exchange'")
     # exit if the execution is in check_mode
     if module.check_mode:
         module.exit_json(**result)
