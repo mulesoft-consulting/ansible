@@ -81,7 +81,8 @@ options:
                 default: 1.0
             tags:
                 description:
-                    - Comma separated list of tags.
+                    - A list of tags for the asset
+                type: list
                 required: false
             group_id:
                 description:
@@ -96,6 +97,21 @@ options:
                     - The assets version
                 required: false
                 default: 1.0.0
+            name:
+                description:
+                    - The assets name
+                    - By default the same name of the Design Center project will be used
+                required: false
+            description:
+                description:
+                    - The assets description
+                    - By default there is no description
+                required: false
+            icon:
+                description:
+                    - The assets icon
+                    - By default the default asset type icon from Anypoint Platform will be used
+                required: false
 
 author:
     - Gonzalo Camino (@gonzalo-camino)
@@ -156,66 +172,36 @@ import re
 import json
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.urls import open_url
+from ansible.module_utils.cloud.anypoint import ap_common
+from ansible.module_utils.cloud.anypoint import ap_exchange_common
 
 
-def get_anypointcli_path(module):
-    return module.get_bin_path('anypoint-cli', True, ['/usr/local/bin'])
-
-
-def execute_http_call(caller, module, url, method, headers, payload):
-    return_value = None
-    try:
-        if (headers is not None):
-            if (payload is not None):
-                return_value = open_url(url, method=method, headers=headers, data=payload)
-            else:
-                return_value = open_url(url, method=method, headers=headers)
-
-    except Exception as e:
-        module.fail_json(msg=caller + ' ' + str(e))
-
-    return return_value
-
-
-def do_no_action_design_center(module, cmd_base):
+def get_context_design_center(module, cmd_base):
     return_value = None
     cmd_final = cmd_base + ' list --output json --pageIndex 0 --pageSize 500'
     cmd_final += ' "' + module.params['name'] + '"'
 
-    result = module.run_command(cmd_final)
-
-    if result[0] != 0:
-        module.fail_json(msg=result[1])
+    result = ap_common.execute_anypoint_cli('[get_context_design_center]', module, cmd_final)
 
     # check if the project exists on design center
-    if len(result[1]) > 2:
-        resp_json = json.loads(result[1])
-        for item in resp_json:
-            if (module.params['name'] == item['Name']):
-                return_value = item['ID']
+    if (result != '\n'):
+        if (len(result) > 2):
+            resp_json = json.loads(result)
+            for item in resp_json:
+                if (module.params['name'] == item['Name']):
+                    return_value = item['ID']
 
     return return_value
 
 
-def do_no_action_exchange(module):
+def get_context_exchange(module):
     return_value = None
     asset_type = module.params['type']
     if (module.params['type'] == 'raml'):
         asset_type = 'rest-api'
     # Query exchange using the Graph API
-    my_url = 'https://' + module.params['host'] + '/graph/api/v1/graphql'
-    headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': 'Bearer ' + module.params['bearer']
-    }
-    payload = {
-        'query': '{assets(asset:{groupId: "' + module.params['exchange_metadata']['group_id'] + '",'
-                 'assetId: "' + module.params['exchange_metadata']['asset_id'] + '",'
-                 'version: "' + module.params['exchange_metadata']['asset_version'] + '"}) {assetId groupId version type name}}'
-    }
-
-    output = json.load(execute_http_call('[do_no_action_exchange]', module, my_url, 'POST', headers, json.dumps(payload)))
+    em = module.params.get('exchange_metadata')
+    output = ap_exchange_common.look_exchange_asset_with_graphql(module, em.get('group_id'), em.get('asset_id'), em.get('asset_version'))
     # check if the environment exists
     if (output['data'] is not None):
         for item in output['data']['assets']:
@@ -228,15 +214,30 @@ def do_no_action_exchange(module):
     return return_value
 
 
-def do_no_action(module, cmd_base):
+def get_context(module, cmd_base):
     return_value = dict(
         design_center_id=None,
-        exchange_id=None
-    )
-    return_value['design_center_id'] = do_no_action_design_center(module, cmd_base)
-    if (module.params['state'] == 'published' or module.params['state'] == 'unpublished'):
-        return_value['exchange_id'] = do_no_action_exchange(module)
+        exchange_id=None,
+        exchange_must_update=False,
+        exchange_must_update_name=False,
+        exchange_must_update_icon=False,
+        exchange_must_update_description=False,
+        exchange_must_update_tags=False
 
+    )
+    return_value['design_center_id'] = get_context_design_center(module, cmd_base)
+    if (module.params['state'] == 'published' or module.params['state'] == 'unpublished'):
+        return_value['exchange_id'] = get_context_exchange(module)
+        if ((return_value['exchange_id'] is not None) and (module.params['state'] == 'published')):
+            em = module.params.get('exchange_metadata')
+            output = ap_exchange_common.analyze_asset(
+                module, em.get('group_id'), em.get('asset_id'), em.get('asset_version'),
+                em.get('name'), em.get('description'), em.get('icon'), em.get('tags'))
+            return_value['exchange_must_update'] = output['must_update']
+            return_value['exchange_must_update_name'] = output['must_update_name']
+            return_value['exchange_must_update_icon'] = output['must_update_icon']
+            return_value['exchange_must_update_description'] = output['must_update_description']
+            return_value['exchange_must_update_tags'] = output['must_update_tags']
     return return_value
 
 
@@ -246,6 +247,7 @@ def get_uuid_regex():
 
 
 def get_org_id_regex():
+    # using FOLDER_GROUP_ID for compatibility with some old
     return '(' + get_uuid_regex() + '|FOLDER_GROUP_ID)'
 
 
@@ -297,7 +299,7 @@ def create_empty_project(module, cmd_base):
     if (module.params['type'] == 'raml-fragment'):
         cmd_final += " --fragment-type " + module.params['fragment_type']
     cmd_final += ' "' + module.params['name'] + '"'
-    result = module.run_command(cmd_final)
+    result = ap_common.execute_anypoint_cli('[create_empty_project]', module, cmd_final)
 
     return result
 
@@ -307,12 +309,12 @@ def upload_project(module, cmd_base):
     cmd_final += ' "' + module.params['name'] + '"'
     cmd_final += ' "' + module.params['project_dir'] + '"'
 
-    result = module.run_command(cmd_final)
+    result = ap_common.execute_anypoint_cli('[upload_project]', module, cmd_final)
 
     return result
 
 
-def publish_project_to_exchange(module, cmd_base):
+def publish_project_to_exchange(module, context, cmd_base):
     cmd_final = cmd_base
     cmd_final += ' publish'
 
@@ -323,41 +325,34 @@ def publish_project_to_exchange(module, cmd_base):
     cmd_final += ' --assetId "' + module.params['exchange_metadata']['asset_id'] + '"'
     cmd_final += ' --version "' + module.params['exchange_metadata']['asset_version'] + '"'
 
-    if module.params['exchange_metadata']['tags'] is not None:
-        cmd_final += ' --tags "' + module.params['tags'] + '"'
+    if (module.params['exchange_metadata']['tags']):
+        tag_list = ','.join(module.params['exchange_metadata']['tags'])
+        cmd_final += ' --tags "' + tag_list + '"'
 
     cmd_final += ' "' + module.params['name'] + '"'
-    result = module.run_command(cmd_final)
+    ap_common.execute_anypoint_cli('[publish_project_to_exchange]', module, cmd_final)
+    # update asset description and icon if it is required (tags are handled at publishing time)
+    em = module.params['exchange_metadata']
+    if (em.get('description') is not None and em.get('description') != ''):
+        context['exchange_must_update_description'] = True
+    if (em.get('icon') is not None and em.get('icon') != ''):
+        context['exchange_must_update_icon'] = True
+    ap_exchange_common.modify_exchange_asset(
+        module, em['group_id'], em['asset_id'], em['asset_version'], context, None, em.get('description'), em.get('icon'), []
+    )
 
-    return result
-
-
-def get_asset_identifier(group_id, asset_id, asset_version):
-    return group_id + '/' + asset_id + '/' + asset_version
-
-
-def get_exchange1_url(module, need_version):
-    url = 'https://' + module.params['host'] + '/exchange/api/v1/organizations/' + module.params['organization_id'] + '/assets/'
-    if (need_version is True):
-        ex_meta = module.params['exchange_metadata']
-        url += get_asset_identifier(ex_meta['group_id'], ex_meta['asset_id'], ex_meta['asset_version'])
-    else:
-        url += module.params['group_id'] + '/' + module.params['asset_id']
-    return url
+    return 'Project published to Exchange'
 
 
 def unpublish_project_from_exchange(module):
-    my_url = get_exchange1_url(module, True)
-    headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
-    execute_http_call('[unpublish_project_from_exchange]', module, my_url, 'DELETE', headers, None)
-    return_value = [0, 'Asset unpublished from Exchange']
-
-    return return_value
+    em = module.params.get('exchange_metadata')
+    ap_exchange_common.delete_exchange_asset(module, em.get('group_id'), em.get('asset_id'), em.get('asset_version'))
+    return 'Asset unpublished from Exchange'
 
 
 def delete_project(module, cmd_base):
     cmd_final = cmd_base + ' delete' ' "' + module.params['name'] + '"'
-    result = module.run_command(cmd_final)
+    result = ap_common.execute_anypoint_cli('[delete_project]', module, cmd_final)
 
     return result
 
@@ -367,10 +362,13 @@ def run_module():
     exchange_metadata_spec = dict(
         main=dict(type='str', required=False, default=None),
         api_version=dict(type='str', required=False, default="1.0"),
-        tags=dict(type='str', required=False),
+        tags=dict(type='list', required=False, default=[]),
         group_id=dict(type='str', required=False, default=None),
         asset_id=dict(type='str', required=False, default=None),
-        asset_version=dict(type='str', required=False, default="1.0.0")
+        asset_version=dict(type='str', required=False, default="1.0.0"),
+        name=dict(type='str', required=False, default=None),
+        description=dict(type='str', required=False, default=''),
+        icon=dict(type='str', required=False, default=None)
     )
     # define available arguments/parameters a user can pass to the module
     module_args = dict(
@@ -398,7 +396,7 @@ def run_module():
 
     # Main Module Logic
     # first all check that the anypoint-cli binary is present on the host
-    anypoint_cli = get_anypointcli_path(module)
+    anypoint_cli = ap_common.get_anypointcli_path(module)
     if (anypoint_cli is None):
         module.fail_json(msg="anypoint-cli binary not present on host")
 
@@ -438,13 +436,16 @@ def run_module():
         module.exit_json(**result)
 
     # exit if I need to do nothing, so check if asset exists in exchange
-    context = do_no_action(module, cmd_base)
+    context = get_context(module, cmd_base)
 
     # finally execute some stuff based on the actual state
     if (module.params['state'] == "present") or (module.params['state'] == "published"):
         # validate if don't need to make changes
-        if (module.params['state'] == "published") and (context['design_center_id'] is not None) and (context['exchange_id'] is not None):
-            # asset already exists and it is published
+        if ((module.params['state'] == "published")
+                and (context['design_center_id'] is not None)
+                and (context['exchange_id'] is not None)
+                and (context['exchange_must_update'] is False)):
+            # asset already exists, it is published and it doesn't requires metadata updates
             module.exit_json(**result)  # do nothing
 
         if (module.params['state'] == "present") and (context['design_center_id'] is not None) and (module.params['project_dir'] is None):
@@ -454,18 +455,21 @@ def run_module():
         # design center part
         if (context['design_center_id'] is None):
             output = create_empty_project(module, cmd_base)
-            if output[0] != 0:
-                module.fail_json(msg=output[1])
 
         if (module.params['project_dir'] is not None):
             prepare_project_to_upload(module.params['project_dir'], module.params['organization_id'])
             output = upload_project(module, cmd_base)
-            if output[0] != 0:
-                module.fail_json(msg=output[1])
+
         # exchange part
         if (module.params['state'] == "published"):
             if (context['exchange_id'] is None):
-                output = publish_project_to_exchange(module, cmd_base)
+                output = publish_project_to_exchange(module, context, cmd_base)
+            # update metadata if it is required
+            if (context['exchange_must_update'] is True):
+                em = module.params['exchange_metadata']
+                output = ap_exchange_common.modify_exchange_asset(
+                    module, em.get('group_id'), em.get('asset_id'), em.get('asset_version'),
+                    context, em.get('name'), em.get('description'), em.get('icon'), em.get('tags'))
     elif (module.params['state'] == "unpublished"):
         if (context['exchange_id'] is None):
             module.exit_json(**result)  # do nothing
@@ -477,10 +481,7 @@ def run_module():
         else:
             output = delete_project(module, cmd_base)
 
-    if output[0] != 0:
-        module.fail_json(msg=output[1])
-
-    result['msg'] = output[1]
+    result['msg'] = output.replace('\n', '')
     result['changed'] = True
 
     module.exit_json(**result)
