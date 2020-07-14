@@ -109,8 +109,9 @@ options:
                 required: false
             icon:
                 description:
-                    - The assets icon
-                    - By default the default asset type icon from Anypoint Platform will be used
+                    - Path to the asset icon file.
+                    - Supported extensions: svg, png, jpg, jpeg
+                type: path
                 required: false
 
 author:
@@ -368,7 +369,7 @@ def run_module():
         asset_version=dict(type='str', required=False, default="1.0.0"),
         name=dict(type='str', required=False, default=None),
         description=dict(type='str', required=False, default=''),
-        icon=dict(type='str', required=False, default=None)
+        icon=dict(type='path', required=False, default=None)
     )
     # define available arguments/parameters a user can pass to the module
     module_args = dict(
