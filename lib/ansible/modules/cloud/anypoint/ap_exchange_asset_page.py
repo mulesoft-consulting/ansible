@@ -108,43 +108,22 @@ import os
 import uuid
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.urls import open_url
-
-
-def get_anypointcli_path(module):
-    return module.get_bin_path('anypoint-cli', True, ['/usr/local/bin'])
-
-
-def get_asset_identifier(group_id, asset_id, asset_version):
-    return group_id + '/' + asset_id + '/' + asset_version
+from ansible.module_utils.cloud.anypoint import ap_common
+from ansible.module_utils.cloud.anypoint import ap_exchange_common
 
 
 def get_exchange_url(module):
     url = 'https://' + module.params['host'] + '/exchange/api/v2/assets/'
-    url += get_asset_identifier(module.params['group_id'], module.params['asset_id'], module.params['asset_version']) + '/portal/draft'
+    url += ap_exchange_common.get_asset_identifier(module.params['group_id'], module.params['asset_id'], module.params['asset_version']) + '/portal/draft'
     return url
-
-
-def execute_http_call(module, url, method, headers, payload):
-    return_value = None
-    try:
-        if (headers is not None):
-            if (payload is not None):
-                return_value = open_url(url, method=method, headers=headers, data=payload)
-            else:
-                return_value = open_url(url, method=method, headers=headers)
-
-    except Exception as e:
-        module.fail_json(msg=str(e))
-
-    return return_value
 
 
 def get_asset_resources(module):
     my_url = get_exchange_url(module) + '/resources'
     headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
 
-    output = execute_http_call(module, my_url, 'GET', headers, None)
-    resp_json = json.loads(output.read())
+    resp_json = ap_common.execute_http_call('[get_asset_resources]', module, my_url, 'GET', headers, None)
+
     return resp_json
 
 
@@ -157,31 +136,29 @@ def remove_uuid_from_resource_name(name):
     return original_name
 
 
-def execute_anypoint_command(module, action, other_args):
-    asset_identifier = get_asset_identifier(module.params['group_id'], module.params['asset_id'], module.params['asset_version'])
-    cmd = get_anypointcli_path(module) + ' --bearer="' + module.params['bearer'] + '"'
+def execute_exchange_asset_page_command(module, action, other_args):
+    asset_identifier = ap_exchange_common.get_asset_identifier(module.params['group_id'], module.params['asset_id'], module.params['asset_version'])
+    cmd = ap_common.get_anypointcli_path(module) + ' --bearer="' + module.params['bearer'] + '"'
     cmd += ' --host="' + module.params['host'] + '"'
     cmd += ' --organization="' + module.params['organization'] + '"'
     cmd += ' exchange asset page ' + action + ' "' + asset_identifier + '"' + other_args + ' --output json'
 
-    output = module.run_command(cmd)
+    output = ap_common.execute_anypoint_cli('[execute_exchange_asset_page_command]', module, cmd)
 
-    if output[0] != 0:
-        module.fail_json(msg='[execute_anypoint_command] ' + output[1])
-
-    return output[1]
+    return output
 
 
 def replace_resource_names(module, filedata):
-    resource_regex = r'!\[resources\/.*\]'
     resources_uploaded = get_asset_resources(module)
+    resource_regex = r'(!\[resources\/[\w,\s-]+(.jpg|.jpge|.png)\])'
     page_resources_to_replace = re.findall(resource_regex, filedata)
     for ocurrence in page_resources_to_replace:
+        parsedOcurrence = ocurrence[0]
         # here I expect a string like "![resources/chalo-2b5affd5-2584-4ccc-a46a-68aeb77806b5.jpg]""
-        resource_name = ocurrence.replace('![', '').replace(']', '')
+        resource_name = parsedOcurrence.replace('![', '').replace(']', '')
         original_resource_name = resource_name
-        # if the resource name contains '%', I just remove it becuase it causes troubles at resoruce upload time
-        raw_resource_name = resource_name.replace('resources/', '').replace(r'%','')
+        # if the resource name contains '%', I just remove it becuase it causes troubles at resource upload time
+        raw_resource_name = resource_name.replace('resources/', '').replace(r'%', '')
         for uploaded_resource in resources_uploaded:
             tmp = remove_uuid_from_resource_name(uploaded_resource['path'].replace('resources/', ''))
             if (tmp == raw_resource_name):
@@ -199,12 +176,11 @@ def page_content_must_change(module):
         module.fail_json(msg="[page_content_must_change] Error reading file %s" % module.params['md_path'])
 
     try:
-    
         os.mkdir(tmp_dir)
     except Exception as e:
         module.fail_json(msg="[page_content_must_change] Creation of the directory %s failed" % tmp_dir)
 
-    execute_anypoint_command(module, 'download', ' "' + tmp_dir + '" "' + module.params['name'] + '"')
+    execute_exchange_asset_page_command(module, 'download', ' "' + tmp_dir + '" "' + module.params['name'] + '"')
 
     downloaded_file = tmp_dir + '/' + module.params['name'] + '.md'
     f = open(downloaded_file, 'r')
@@ -233,7 +209,7 @@ def get_context(module):
     )
     page_exists = False
 
-    output = execute_anypoint_command(module, 'list', '')
+    output = execute_exchange_asset_page_command(module, 'list', '')
 
     cleaned_result = output.replace('Getting asset pages list', '')
     if (len(cleaned_result) > 2):
@@ -292,7 +268,7 @@ def run_module():
 
     # Main Module Logic
     # first all check that the anypoint-cli binary is present on the host
-    if (get_anypointcli_path(module) is None):
+    if (ap_common.get_anypointcli_path(module) is None):
         module.fail_json(msg="anypoint-cli binary not present on host")
 
     # validations pre check_mode
@@ -317,7 +293,7 @@ def run_module():
     elif (module.params['state'] == 'absent'):
         action = 'delete'
 
-    output = execute_anypoint_command(module, action, other_args)
+    output = execute_exchange_asset_page_command(module, action, other_args)
 
     result['msg'] = output
     result['changed'] = True
