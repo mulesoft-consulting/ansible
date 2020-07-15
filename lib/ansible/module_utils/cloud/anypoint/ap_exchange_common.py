@@ -70,6 +70,9 @@ def analyze_asset(module, group_id, asset_id, asset_version, name, description, 
     if (resp_json['status'] == 'deprecated'):
         return_value['deprecated'] = True
 
+    if (name != resp_json['name']):
+        return_value['must_update_name'] = True
+
     if (tags != resp_json['labels']):
         return_value['must_update_tags'] = True
 
@@ -100,8 +103,9 @@ def analyze_asset(module, group_id, asset_id, asset_version, name, description, 
                 return_value['must_update_icon'] = True
 
     return_value['must_update'] = (return_value['must_update_description'] is True 
-        or return_value['must_update_icon']is True 
-        or return_value['must_update_tags'] is True)
+        or return_value['must_update_icon'] is True 
+        or return_value['must_update_tags'] is True
+        or return_value['must_update_name'] is True)
 
     return return_value
 

@@ -336,9 +336,9 @@ def publish_project_to_exchange(module, context, cmd_base):
     em = module.params['exchange_metadata']
     if (em.get('description') is not None and em.get('description') != ''):
         context['exchange_must_update_description'] = True
-    if (em.get('icon') is not None and em.get('icon') != ''):
+    if (em.get('icon') is not None):
         context['exchange_must_update_icon'] = True
-    if (em.get('name') is not None and em.get('name') != ''):
+    if (em.get('name') is not None and em.get('name') != module.params['name']):
         context['exchange_must_update_name'] = True
     ap_exchange_common.modify_exchange_asset(
         module, em['group_id'], em['asset_id'], em['asset_version'], context, em.get('name'), em.get('description'), em.get('icon'), []
