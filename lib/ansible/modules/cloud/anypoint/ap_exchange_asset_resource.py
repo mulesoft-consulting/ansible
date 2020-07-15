@@ -111,6 +111,8 @@ import importlib
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.basic import missing_required_lib
 from ansible.module_utils.urls import open_url
+from ansible.module_utils.cloud.anypoint import ap_common
+from ansible.module_utils.cloud.anypoint import ap_exchange_common
 import traceback
 LIB_IMP_ERR = None
 try:
@@ -121,29 +123,10 @@ except Exception:
     LIB_IMP_ERR = traceback.format_exc()
 
 
-def get_asset_identifier(group_id, asset_id, asset_version):
-    return group_id + '/' + asset_id + '/' + asset_version
-
-
-def get_exchange_url(module):
-    url = 'https://' + module.params['host'] + '/exchange/api/v2/assets/'
-    url += get_asset_identifier(module.params['group_id'], module.params['asset_id'], module.params['asset_version']) + '/portal/draft'
+def get_exchange_asset_portal_url(module):
+    url = ap_exchange_common.get_exchange_v2_url(module, module.params['group_id'], module.params['asset_id'], module.params['asset_version'], True)
+    url += '/portal/draft'
     return url
-
-
-def execute_http_call(module, url, method, headers, payload):
-    return_value = None
-    try:
-        if (headers is not None):
-            if (payload is not None):
-                return_value = open_url(url, method=method, headers=headers, data=payload)
-            else:
-                return_value = open_url(url, method=method, headers=headers)
-
-    except Exception as e:
-        module.fail_json(msg=str(e))
-
-    return return_value
 
 
 def remove_uuid_from_resource_name(name):
@@ -152,7 +135,7 @@ def remove_uuid_from_resource_name(name):
     final_index = len(name_without_extension) - 37
     original_name = name_without_extension[0:final_index] + name_extension
     # also replace '%' characters because it causes a different name after the resource upload
-    original_name.replace(r'%','')
+    original_name.replace(r'%', '')
 
     return original_name
 
@@ -163,11 +146,10 @@ def get_context(module):
         resource_url=None
     )
 
-    my_url = get_exchange_url(module) + '/resources'
+    my_url = get_exchange_asset_portal_url(module) + '/resources'
     headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
 
-    output = execute_http_call(module, my_url, 'GET', headers, None)
-    resp_json = json.loads(output.read())
+    resp_json = ap_common.execute_http_call('[get_context]', module, my_url, 'GET', headers, None)
 
     # check if asset's resource exists
     for item in resp_json:
@@ -188,10 +170,10 @@ def create_resource(module):
         msg='Resource created',
         resource_url=None
     )
-    portal_resources_url = get_exchange_url(module) + '/resources'
+    portal_resources_url = get_exchange_asset_portal_url(module) + '/resources'
     headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
-
-    image_filename = os.path.basename(module.params['path']).replace(r'%','')
+    # if the resource name contains '%', I just remove it becuase it causes troubles at resource upload time
+    image_filename = os.path.basename(module.params['path']).replace(r'%', '')
     data = {
         'data': (image_filename, open(module.params['path'], 'rb'), 'image/png')
     }
@@ -216,10 +198,10 @@ def delete_resource(module, resource_url):
         msg='Resource deleted',
         resource_url=None
     )
-    my_url = get_exchange_url(module) + '/' + resource_url
+    my_url = get_exchange_asset_portal_url(module) + '/' + resource_url
     headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
 
-    output = execute_http_call(module, my_url, 'DELETE', headers, None)
+    ap_common.execute_http_call('[delete_resource]', module, my_url, 'DELETE', headers, None)
 
     return return_value
 
