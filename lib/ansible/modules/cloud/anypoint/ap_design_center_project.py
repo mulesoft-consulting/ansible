@@ -338,8 +338,10 @@ def publish_project_to_exchange(module, context, cmd_base):
         context['exchange_must_update_description'] = True
     if (em.get('icon') is not None and em.get('icon') != ''):
         context['exchange_must_update_icon'] = True
+    if (em.get('name') is not None and em.get('name') != ''):
+        context['exchange_must_update_name'] = True
     ap_exchange_common.modify_exchange_asset(
-        module, em['group_id'], em['asset_id'], em['asset_version'], context, None, em.get('description'), em.get('icon'), []
+        module, em['group_id'], em['asset_id'], em['asset_version'], context, em.get('name'), em.get('description'), em.get('icon'), []
     )
 
     return 'Project published to Exchange'
@@ -411,6 +413,10 @@ def run_module():
     if (module.params['state'] == "present") or (module.params['state'] == "published"):
         if module.params['type'] is None:
             module.fail_json(msg="present and published states needs 'type' option")
+        if (module.params['exchange_metadata'].get('icon') == ''):
+            module.params['exchange_metadata']['icon'] = None
+        if (module.params['exchange_metadata'].get('name') == ''):
+            module.params['exchange_metadata']['name'] = None
 
         if module.params['type'] == 'raml-fragment':
             if module.params['fragment_type'] is None:
