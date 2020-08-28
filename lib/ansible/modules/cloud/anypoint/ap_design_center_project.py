@@ -110,7 +110,7 @@ options:
             icon:
                 description:
                     - Path to the asset icon file.
-                    - Supported extensions: svg, png, jpg, jpeg
+                    - Supported extensions are svg, png, jpg, jpeg
                 type: path
                 required: false
 

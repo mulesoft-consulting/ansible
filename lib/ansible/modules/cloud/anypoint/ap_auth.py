@@ -99,12 +99,6 @@ def run_module():
     headers = {'Content-Type': 'application/json'}
     payload = {"username": module.params['name'], "password": module.params['password']}
 
-    #try:
-    #    resp = open_url(my_url, method="POST", headers=headers, data=json.dumps(payload))
-    #except Exception as e:
-    #    module.fail_json(msg=str(e))
-
-    #resp_json = json.loads(resp.read())
     resp_json = ap_common.execute_http_call('[run_module]', module, my_url, 'POST', headers, payload)
     result['access_token'] = resp_json["access_token"]
     result['message'] = 'Authenticated'

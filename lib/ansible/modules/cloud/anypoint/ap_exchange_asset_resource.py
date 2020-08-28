@@ -112,6 +112,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.basic import missing_required_lib
 from ansible.module_utils.urls import open_url
 from ansible.module_utils.cloud.anypoint import ap_common
+from ansible.module_utils.cloud.anypoint import ap_account_common
 from ansible.module_utils.cloud.anypoint import ap_exchange_common
 import traceback
 LIB_IMP_ERR = None
@@ -171,7 +172,10 @@ def create_resource(module):
         resource_url=None
     )
     portal_resources_url = get_exchange_asset_portal_url(module) + '/resources'
-    headers = {'Accept': 'application/json', 'Authorization': 'Bearer ' + module.params['bearer']}
+    headers = {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer ' + module.params['bearer']
+    }
     # if the resource name contains '%', I just remove it becuase it causes troubles at resource upload time
     image_filename = os.path.basename(module.params['path']).replace(r'%', '')
     data = {
@@ -184,11 +188,13 @@ def create_resource(module):
         s = requests.Session()
         resp = s.send(prepared)
         resp_json = json.loads(resp.text)
-        resp_json["path"]
+        return_value['resource_url'] = resp_json["path"]
     except Exception as e:
-        module.fail_json(msg='[create_resource] ' + str(e) + str(resp_json))
-
-    return_value['resource_url'] = resp_json["path"]
+        resp_error = {
+            'body': resp_json,
+            'headers': resp.headers
+        }
+        module.fail_json(msg='[create_resource] ' + str(resp_error))
 
     return return_value
 

@@ -207,7 +207,7 @@ options:
                 required: false
                 type: int
                 default: 80
-            protocol: 
+            protocol:
                 description:
                     - The protocol used by the api to be consumed
                     - This will add the "<id>.protocol" property
@@ -405,7 +405,7 @@ def create_or_update_cloudhub_application(module, cmd_base, context):
     cmd_final += ' --staticIPsEnabled "' + str(module.params['static_ips_enabled']) + '"'
     cmd_final += ' --objectStoreV1 "' + str(module.params['object_store_v1']) + '"'
     cmd_final += ' --autoRestart "' + str(module.params['auto_restart']) + '"'
-    
+
     # validate properties option: either property list or property file
     if (module.params['properties_file'] is not None):
         cmd_final += ' --propertiesFile "' + module.params['properties_file'] + '"'
@@ -587,16 +587,20 @@ def run_module():
         elif (module.params['runtime'] is None):
             module.fail_json(msg="present state needs 'runtime' option")
         if (module.params['properties_file'] is not None):
-            if ((module.params['properties'] is not None) 
-                    or (module.params['api_manager'] is not None) 
-                    or (module.params['visualizer'] is not None) 
+            if ((module.params['properties'] is not None)
+                    or (module.params['api_manager'] is not None)
+                    or (module.params['visualizer'] is not None)
                     or (module.params['monitoring_enabled'] is not None)):
-                module.fail_json(msg="you can't use 'properties_file' in conjunction with 'properties', 'api_manager', 'visualizer_layer' or 'monitoring_enabled'")
+                module.fail_json(
+                    msg="you can't use 'properties_file' in conjunction with 'properties', 'api_manager', 'visualizer_layer' or 'monitoring_enabled'"
+                )
         if (module.params.get('api_manager') is not None):
             if (module.params['api_manager'].get('api_id') is not None):
                 if ((module.params['api_manager'].get('env_client_id') is None)
                         or (module.params['api_manager'].get('env_client_secret') is None)):
-                    module.fail_json(msg="to register the app with api manager the parameters 'api_id', 'env_client_id' and 'env_client_secret' must be present")
+                    module.fail_json(
+                        msg="to register the app with api manager the parameters 'api_id', 'env_client_id' and 'env_client_secret' must be present"
+                    )
     # no specific parameters for other states needs to be checked
 
     # if the user is working with this module in only check mode we do not
