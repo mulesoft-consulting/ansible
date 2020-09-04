@@ -299,6 +299,11 @@ def create_settings_xml(module):
     xml_content += r'            <username>~~~Token~~~</username>' + '\n'
     xml_content += r'            <password>' + module.params['bearer'] + r'</password>' + '\n'
     xml_content += r'        </server>' + '\n'
+    xml_content += r'        <server>' + '\n'
+    xml_content += r'            <id>anypoint-exchange-v2</id>' + '\n'
+    xml_content += r'            <username>~~~Token~~~</username>' + '\n'
+    xml_content += r'            <password>' + module.params['bearer'] + r'</password>' + '\n'
+    xml_content += r'        </server>' + '\n'
     xml_content += r'    </servers>' + '\n'
     xml_content += r'</settings>' + '\n'
     # create the settings file
