@@ -70,7 +70,7 @@ def analyze_asset(module, group_id, asset_id, asset_version, name, description, 
     if (resp_json['status'] == 'deprecated'):
         return_value['deprecated'] = True
 
-    if (name != resp_json['name']):
+    if ((name is not None) and (name != resp_json['name'])):
         return_value['must_update_name'] = True
 
     if (tags != resp_json['labels']):
