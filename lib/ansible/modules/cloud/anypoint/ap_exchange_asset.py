@@ -487,7 +487,7 @@ def run_module():
         main_file=dict(type='path', required=False, default=None),
         file_path=dict(type='path', required=False, default=None),
         tags=dict(type='list', required=False, default=[]),
-        description=dict(type='str', required=False),
+        description=dict(type='str', required=False, default=''),
         icon=dict(type='path', required=False, default=None),
         maven=dict(type='dict', options=maven_spec)
     )
@@ -509,9 +509,6 @@ def run_module():
     if (get_maven_path(module) is None):
         module.fail_json(msg="[run_module] maven binary not present on host")
 
-    if module.check_mode:
-        module.exit_json(**result)
-
     cmd_base = ap_common.get_anypointcli_path(module) + ' --bearer="' + module.params['bearer'] + '"'
     cmd_base += ' --host="' + module.params['host'] + '"'
     cmd_base += ' --organization="' + module.params['organization'] + '"'
@@ -525,8 +522,6 @@ def run_module():
         module.params['file_path'] = None
     if (module.params['icon'] == ''):
         module.params['icon'] = None
-    if (module.params['description'] == ''):
-        module.params['description'] = None
     if (module.params['maven'] is not None) and (module.params['maven'].get('sources') == ''):
         module.params['maven']['sources'] = None
 
@@ -544,6 +539,9 @@ def run_module():
                 or (module.params['type'] == 'policy')):
             if (module.params['file_path'] is None):
                 module.fail_json(msg='[run_module] asset type oas, wsdl, connector, extension or policy requires a file path to upload it')
+
+    if module.check_mode:
+        module.exit_json(**result)
 
     # exit if I need to do nothing, so check if environment exists
     context = get_context(module, cmd_base)
